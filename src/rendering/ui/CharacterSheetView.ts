@@ -1,5 +1,6 @@
 import type { EntityManager } from "@entities/EntityManager";
 import type { EntityId } from "@entities/Entity";
+import type { Party } from "@entities/Party";
 import { AppearanceComponent } from "@entities/components/AppearanceComponent";
 import { PawnComponent } from "@entities/components/PawnComponent";
 import { StatsComponent } from "@entities/components/StatsComponent";
@@ -35,9 +36,12 @@ export class CharacterSheetView {
   private readonly panel: HTMLDivElement;
   private readonly body: HTMLDivElement;
 
+  private readonly inventory: HTMLDivElement;
+
   constructor(
     private readonly manager: EntityManager,
-    private readonly pawnRegistry: ResourceRegistry<PawnDefinition>
+    private readonly pawnRegistry: ResourceRegistry<PawnDefinition>,
+    private readonly party: Party
   ) {
     this.element = document.createElement("div");
     this.element.className = "character-sheet";
@@ -50,6 +54,10 @@ export class CharacterSheetView {
     this.body = document.createElement("div");
     this.body.className = "character-sheet__body";
     this.panel.appendChild(this.body);
+
+    this.inventory = document.createElement("div");
+    this.inventory.className = "character-sheet__inventory";
+    this.panel.appendChild(this.inventory);
 
     this.element.appendChild(this.panel);
 
@@ -93,6 +101,19 @@ export class CharacterSheetView {
     this.body.replaceChildren();
     this.body.appendChild(this.buildPortraitColumn(appearance.appearance, equipment));
     this.body.appendChild(this.buildStatsColumn(stats, experience, attributes));
+
+    this.inventory.replaceChildren(...this.buildInventorySlots());
+  }
+
+  /** Shared party inventory — every party member sees the same items. */
+  private buildInventorySlots(): HTMLDivElement[] {
+    return this.party.getInventory().map((itemId) => {
+      const slotEl = document.createElement("div");
+      slotEl.className = "character-sheet__slot";
+      slotEl.textContent = itemId ?? "";
+      if (!itemId) slotEl.classList.add("character-sheet__slot--empty");
+      return slotEl;
+    });
   }
 
   private buildCloseButton(): HTMLButtonElement {

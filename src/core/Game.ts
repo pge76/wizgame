@@ -151,7 +151,7 @@ export class Game {
     mountEl.appendChild(this.partyBarView.element);
     this.partyBarView.sync();
 
-    this.characterSheetView = new CharacterSheetView(this.entityManager, this.pawnRegistry);
+    this.characterSheetView = new CharacterSheetView(this.entityManager, this.pawnRegistry, this.party);
     mountEl.appendChild(this.characterSheetView.element);
 
     this.battleHudView = new BattleHudView(this.entityManager, this.pawnRegistry);
