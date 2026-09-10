@@ -59,10 +59,10 @@ export class BattleSystem implements System {
   private checkOutcome(manager: EntityManager): void {
     const combatants = manager.query(StatsComponent, FactionComponent, BattleParticipantComponent);
     const aliveEnemies = combatants.filter(
-      (id) => manager.getComponent(id, FactionComponent)!.faction === Faction.Enemy && isAlive(manager, id)
+      (id) => manager.getComponent(id, FactionComponent)!.faction === Faction.Monster && isAlive(manager, id)
     );
     const alivePlayers = combatants.filter(
-      (id) => manager.getComponent(id, FactionComponent)!.faction === Faction.Player && isAlive(manager, id)
+      (id) => manager.getComponent(id, FactionComponent)!.faction === Faction.PC && isAlive(manager, id)
     );
 
     if (aliveEnemies.length === 0) this.state.outcome = BattleOutcome.Victory;

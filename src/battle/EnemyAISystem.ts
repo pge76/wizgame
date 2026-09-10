@@ -70,7 +70,7 @@ export class EnemyAISystem {
 
     const targets = manager
       .query(StatsComponent, FactionComponent, TransformComponent)
-      .filter((id) => manager.getComponent(id, FactionComponent)!.faction === Faction.Player && manager.getComponent(id, StatsComponent)!.currentHP > 0);
+      .filter((id) => manager.getComponent(id, FactionComponent)!.faction === Faction.PC && manager.getComponent(id, StatsComponent)!.currentHP > 0);
     if (targets.length === 0) return null;
 
     const nearest = targets.reduce((best, id) => {

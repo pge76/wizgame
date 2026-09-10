@@ -2,6 +2,7 @@ import "@rendering/ui/party-bar.css";
 import "@rendering/ui/battle-hud.css";
 import "@rendering/ui/battle-action-bar.css";
 import "@rendering/ui/battle-log.css";
+import "@rendering/ui/character-sheet.css";
 import { Game } from "@core/Game";
 
 const mountEl = document.getElementById("app");

@@ -1,0 +1,123 @@
+.character-sheet {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+}
+
+.character-sheet[hidden] {
+  display: none;
+}
+
+.character-sheet__panel {
+  position: relative;
+  background: #111116;
+  border: 1px solid #4a4a55;
+  border-radius: 8px;
+  padding: 20px 28px;
+  min-width: 640px;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.character-sheet__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #f0d9a0;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.character-sheet__close:hover {
+  color: #cba135;
+}
+
+.character-sheet__body {
+  display: flex;
+  gap: 32px;
+}
+
+.character-sheet__portrait-column {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+}
+
+.character-sheet__portrait-wrap {
+  width: 140px;
+  height: 180px;
+}
+
+.character-sheet__portrait-wrap svg {
+  width: 100%;
+  height: 100%;
+}
+
+.character-sheet__slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.character-sheet__hand-slots {
+  grid-column: 1 / span 3;
+  display: flex;
+  gap: 8px;
+}
+
+.character-sheet__slot {
+  width: 64px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 10px;
+  color: #f0d9a0;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.character-sheet__slot--empty {
+  color: #6a6a75;
+}
+
+.character-sheet__stats-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.character-sheet__stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #d8d8e0;
+}
+
+.character-sheet__stat-label {
+  color: #a0a0ac;
+}
+
+.character-sheet__stat-value {
+  color: #f0d9a0;
+  font-weight: bold;
+}
+
+.character-sheet__divider {
+  border: none;
+  border-top: 1px solid #4a4a55;
+  margin: 6px 0;
+}

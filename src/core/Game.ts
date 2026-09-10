@@ -7,6 +7,8 @@ import { AppearanceComponent } from "@entities/components/AppearanceComponent";
 import { MovementComponent } from "@entities/components/MovementComponent";
 import { AttackAnimationComponent } from "@entities/components/AttackAnimationComponent";
 import { StatsComponent } from "@entities/components/StatsComponent";
+import { ExperienceComponent } from "@entities/components/ExperienceComponent";
+import { EquipmentComponent } from "@entities/components/EquipmentComponent";
 import { FactionComponent } from "@entities/components/FactionComponent";
 import { BattleParticipantComponent } from "@entities/components/BattleParticipantComponent";
 import { PlayerAiBehaviorComponent } from "@entities/components/PlayerAiBehaviorComponent";
@@ -41,6 +43,7 @@ import { CameraController } from "@rendering/CameraController";
 import { PlayerInputController } from "@rendering/PlayerInputController";
 import { BattleInputController } from "@rendering/BattleInputController";
 import { PartyBarView } from "@rendering/ui/PartyBarView";
+import { CharacterSheetView } from "@rendering/ui/CharacterSheetView";
 import { BattleHudView } from "@rendering/ui/BattleHudView";
 import { BattleActionBarView } from "@rendering/ui/BattleActionBarView";
 import { BattleLogView, BattleLogEntryKind } from "@rendering/ui/BattleLogView";
@@ -72,6 +75,7 @@ export class Game {
   private gridView!: GridView;
   private pawnView!: PawnView;
   private partyBarView!: PartyBarView;
+  private characterSheetView!: CharacterSheetView;
   private battleHudView!: BattleHudView;
   private battleActionBarView!: BattleActionBarView;
   private battleLogView!: BattleLogView;
@@ -143,9 +147,12 @@ export class Game {
 
     this.renderer.sceneRoot.addChild(this.gridView.container, this.pawnView.container);
 
-    this.partyBarView = new PartyBarView(this.entityManager, this.party);
+    this.partyBarView = new PartyBarView(this.entityManager, this.party, (slot) => this.openCharacterSheet(slot));
     mountEl.appendChild(this.partyBarView.element);
     this.partyBarView.sync();
+
+    this.characterSheetView = new CharacterSheetView(this.entityManager, this.pawnRegistry);
+    mountEl.appendChild(this.characterSheetView.element);
 
     this.battleHudView = new BattleHudView(this.entityManager, this.pawnRegistry);
     mountEl.appendChild(this.battleHudView.element);
@@ -178,6 +185,12 @@ export class Game {
       this.cycleSelection();
     });
 
+    window.addEventListener("keydown", (event) => {
+      const match = /^Digit([1-6])$/.exec(event.code);
+      if (!match || this.mode !== GameMode.Overworld) return;
+      this.openCharacterSheet(Number(match[1]) - 1);
+    });
+
     this.loop = new GameLoop(
       (dt) => this.update(dt),
       () => this.render()
@@ -201,6 +214,8 @@ export class Game {
         new StatsComponent(stats.maxHP, stats.maxHP, stats.attack, stats.defense, stats.initiative)
       );
       this.entityManager.addComponent(id, FactionComponent, new FactionComponent(PAWN_HUMANOID.faction));
+      this.entityManager.addComponent(id, ExperienceComponent, new ExperienceComponent(0, 100));
+      this.entityManager.addComponent(id, EquipmentComponent, new EquipmentComponent());
       this.party.setMember(index, id);
 
       if (index === 0) {
@@ -225,6 +240,13 @@ export class Game {
     this.entityManager.addComponent(id, FactionComponent, new FactionComponent(definition.faction));
     this.grid.getCell(position).occupantEntityId = id;
     this.worldMonsterEntityId = id;
+  }
+
+  /** Opens the character sheet for the given party slot (0-based). No-op if that slot is empty. */
+  private openCharacterSheet(slot: number): void {
+    const id = this.party.getMember(slot);
+    if (id === null) return;
+    this.characterSheetView.show(id);
   }
 
   private commandPlayerMove(target: GridPos): void {
@@ -292,7 +314,7 @@ export class Game {
     this.battleGridView?.setHighlightedTiles([]);
 
     for (const id of this.entityManager.query(FactionComponent, BattleParticipantComponent)) {
-      if (this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Player) {
+      if (this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.PC) {
         const participant = this.entityManager.getComponent(id, BattleParticipantComponent)!;
         participant.hasMoved = false;
         participant.hasAttacked = false;
@@ -467,7 +489,7 @@ export class Game {
   private findNearestEnemy(pos: GridPos): { id: EntityId; pos: GridPos } | null {
     const candidates = this.entityManager
       .query(StatsComponent, FactionComponent, TransformComponent, BattleParticipantComponent)
-      .filter((id) => this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Enemy && this.isAlive(id));
+      .filter((id) => this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Monster && this.isAlive(id));
     if (candidates.length === 0) return null;
 
     let best: { id: EntityId; pos: GridPos; dist: number } | null = null;
@@ -510,7 +532,7 @@ export class Game {
       .query(FactionComponent, BattleParticipantComponent, StatsComponent)
       .filter(
         (id) =>
-          this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Enemy &&
+          this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Monster &&
           this.entityManager.getComponent(id, StatsComponent)!.currentHP > 0
       );
   }
@@ -520,7 +542,7 @@ export class Game {
     if (!this.battleGrid || this.battleState.phase !== BattlePhase.Player) return;
 
     const occupantId = this.battleGrid.getCell(pos).occupantEntityId;
-    const isOwnUnit = occupantId !== null && this.entityManager.getComponent(occupantId, FactionComponent)?.faction === Faction.Player;
+    const isOwnUnit = occupantId !== null && this.entityManager.getComponent(occupantId, FactionComponent)?.faction === Faction.PC;
 
     this.battleState.selectedEntityId = isOwnUnit ? occupantId : null;
     this.updateMovementHighlight();
@@ -557,7 +579,7 @@ export class Game {
 
     if (occupantId !== null) {
       if (participant.hasAttacked) return;
-      if (this.entityManager.getComponent(occupantId, FactionComponent)?.faction !== Faction.Enemy) return;
+      if (this.entityManager.getComponent(occupantId, FactionComponent)?.faction !== Faction.Monster) return;
 
       if (this.battleSystem.resolveMeleeAttack(this.entityManager, actorId, occupantId, this.battleGrid)) {
         participant.hasAttacked = true;
@@ -611,7 +633,7 @@ export class Game {
   }
 
   private logAttack(attackerId: EntityId, targetId: EntityId, attackStat: number, defenseStat: number, damage: number): void {
-    const attackerIsPlayer = this.entityManager.getComponent(attackerId, FactionComponent)?.faction === Faction.Player;
+    const attackerIsPlayer = this.entityManager.getComponent(attackerId, FactionComponent)?.faction === Faction.PC;
     this.battleLogView.log(
       `${this.displayName(attackerId)} attacks ${this.displayName(targetId)}`,
       `(Att ${attackStat} vs Def ${defenseStat} = ${damage} dmg)`,
@@ -633,7 +655,7 @@ export class Game {
 
     return this.battleGrid.neighbors(pos, false).some((n) => {
       const occupantId = this.battleGrid!.getCell(n).occupantEntityId;
-      return occupantId !== null && this.entityManager.getComponent(occupantId, FactionComponent)?.faction === Faction.Enemy && this.isAlive(occupantId);
+      return occupantId !== null && this.entityManager.getComponent(occupantId, FactionComponent)?.faction === Faction.Monster && this.isAlive(occupantId);
     });
   }
 
@@ -642,7 +664,7 @@ export class Game {
     if (this.battleState.phase !== BattlePhase.Player) return exhausted;
 
     for (const id of this.entityManager.query(FactionComponent, BattleParticipantComponent)) {
-      if (this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.Player && !this.hasAvailableAction(id)) {
+      if (this.entityManager.getComponent(id, FactionComponent)!.faction === Faction.PC && !this.hasAvailableAction(id)) {
         exhausted.add(id);
       }
     }
@@ -810,7 +832,7 @@ export class Game {
     this.pendingEnemyIds = [];
 
     for (const id of this.entityManager.query(FactionComponent, BattleParticipantComponent)) {
-      if (this.entityManager.getComponent(id, FactionComponent)?.faction === Faction.Enemy) {
+      if (this.entityManager.getComponent(id, FactionComponent)?.faction === Faction.Monster) {
         this.entityManager.destroyEntity(id);
       }
     }
@@ -865,6 +887,7 @@ export class Game {
       this.pawnView.setHiddenEntities(new Set(nonLeaderMembers));
     }
     this.partyBarView.sync();
+    if (this.characterSheetView.isVisible()) this.characterSheetView.sync();
     this.pawnView.sync();
     this.renderer.render();
   }

@@ -26,8 +26,8 @@ export class BattleHudView {
 
   sync(selectedEntityId: EntityId | null): void {
     const combatants = this.manager.query(StatsComponent, FactionComponent, BattleParticipantComponent);
-    const players = combatants.filter((id) => this.manager.getComponent(id, FactionComponent)!.faction === Faction.Player);
-    const enemies = combatants.filter((id) => this.manager.getComponent(id, FactionComponent)!.faction === Faction.Enemy);
+    const players = combatants.filter((id) => this.manager.getComponent(id, FactionComponent)!.faction === Faction.PC);
+    const enemies = combatants.filter((id) => this.manager.getComponent(id, FactionComponent)!.faction === Faction.Monster);
 
     this.element.replaceChildren();
     for (const id of [...players, ...enemies]) {

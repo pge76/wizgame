@@ -43,7 +43,8 @@ export class PartyBarView {
 
   constructor(
     private readonly manager: EntityManager,
-    private readonly party: Party
+    private readonly party: Party,
+    private readonly onSlotRightClick?: (slot: number) => void
   ) {
     this.element = document.createElement("div");
     this.element.className = "party-bar";
@@ -69,6 +70,11 @@ export class PartyBarView {
       slotEl.addEventListener("mouseenter", () => this.showDebugTooltip(slotEl, side));
       slotEl.addEventListener("mouseleave", () => {
         this.debugTooltip.hidden = true;
+      });
+      const capturedSlot = slot;
+      slotEl.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        this.onSlotRightClick?.(capturedSlot);
       });
       this.slots[slot] = slotEl;
       sideEl.appendChild(slotEl);

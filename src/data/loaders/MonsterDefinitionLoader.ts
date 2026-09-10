@@ -10,8 +10,8 @@ interface MonsterJson {
 }
 
 const FACTION_BY_NAME: Record<MonsterJson["faction"], Faction> = {
-  player: Faction.Player,
-  enemy: Faction.Enemy
+  player: Faction.PC,
+  enemy: Faction.Monster
 };
 
 const AI_BEHAVIOR_BY_NAME: Record<NonNullable<MonsterJson["aiBehavior"]>, AiBehavior> = {
