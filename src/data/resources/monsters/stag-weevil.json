@@ -1,0 +1,8 @@
+{
+  "id": "pawn.stag-weevil",
+  "displayName": "Stag Weevil",
+  "faction": "enemy",
+  "stats": { "maxHP": 14, "attack": 5, "defense": 4, "initiative": 3 },
+  "aiBehavior": "basic",
+  "spriteAsset": "weevil.png"
+}

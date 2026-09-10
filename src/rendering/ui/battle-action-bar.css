@@ -1,0 +1,83 @@
+.battle-action-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 10;
+}
+
+.battle-action-bar[hidden] {
+  display: none;
+}
+
+.battle-action-bar__action {
+  min-width: 90px;
+  padding: 8px 14px;
+  text-align: center;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 6px;
+  color: #888;
+}
+
+.battle-action-bar__action--available {
+  border-color: #cba135;
+  color: #f0d9a0;
+  box-shadow: 0 0 6px rgba(203, 161, 53, 0.6);
+}
+
+.battle-action-bar__action--used {
+  color: #555;
+  text-decoration: line-through;
+}
+
+.battle-action-bar__ai-behavior {
+  padding: 8px 10px;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 6px;
+  color: #ddd;
+  font: inherit;
+}
+
+.battle-action-bar__ai-behavior:disabled {
+  color: #555;
+}
+
+.battle-action-bar__auto-toggle {
+  padding: 8px 14px;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 6px;
+  color: #ddd;
+  cursor: pointer;
+  font: inherit;
+}
+
+.battle-action-bar__auto-toggle:disabled {
+  color: #555;
+  cursor: default;
+}
+
+.battle-action-bar__auto-toggle--active {
+  border-color: #cba135;
+  color: #f0d9a0;
+  box-shadow: 0 0 6px rgba(203, 161, 53, 0.6);
+}
+
+.battle-action-bar__end-turn {
+  padding: 8px 14px;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 6px;
+  color: #ddd;
+  cursor: pointer;
+  font: inherit;
+}
+
+.battle-action-bar__end-turn:hover {
+  border-color: #cba135;
+}

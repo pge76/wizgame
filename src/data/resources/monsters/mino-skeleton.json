@@ -1,0 +1,8 @@
+{
+  "id": "pawn.mino-skeleton",
+  "displayName": "Mino Skeleton",
+  "faction": "enemy",
+  "stats": { "maxHP": 22, "attack": 7, "defense": 3, "initiative": 5 },
+  "aiBehavior": "basic",
+  "spriteAsset": "skeleton.png"
+}

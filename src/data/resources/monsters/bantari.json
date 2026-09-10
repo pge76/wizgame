@@ -1,0 +1,8 @@
+{
+  "id": "pawn.bantari",
+  "displayName": "Bantari",
+  "faction": "enemy",
+  "stats": { "maxHP": 30, "attack": 8, "defense": 3, "initiative": 4 },
+  "aiBehavior": "basic",
+  "spriteAsset": "tari.png"
+}
