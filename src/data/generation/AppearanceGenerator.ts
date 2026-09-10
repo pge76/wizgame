@@ -1,12 +1,16 @@
 import {
-  BODY_SHAPE_IDS,
-  EYE_STYLE_IDS,
+  BODY_SHAPES,
+  EYE_STYLES,
+  FACIAL_FEATURES,
+  FacialFeature,
   HAIR_COLORS,
-  HAIR_STYLE_IDS,
-  HEAD_SHAPE_IDS,
+  HAIR_STYLES,
+  HEAD_SHAPES,
   SKIN_COLORS,
   type AppearanceDefinition
 } from "@data/resources/AppearanceDefinition";
+
+const FACIAL_FEATURE_CHANCE = 0.35;
 
 function pickRandom<T>(items: readonly T[]): T {
   const item = items[Math.floor(Math.random() * items.length)];
@@ -18,10 +22,11 @@ function pickRandom<T>(items: readonly T[]): T {
 
 export function randomAppearance(): AppearanceDefinition {
   return {
-    headShapeId: pickRandom(HEAD_SHAPE_IDS),
-    bodyShapeId: pickRandom(BODY_SHAPE_IDS),
-    hairStyleId: pickRandom(HAIR_STYLE_IDS),
-    eyeStyleId: pickRandom(EYE_STYLE_IDS),
+    headShape: pickRandom(HEAD_SHAPES),
+    bodyShape: pickRandom(BODY_SHAPES),
+    hairStyle: pickRandom(HAIR_STYLES),
+    eyeStyle: pickRandom(EYE_STYLES),
+    facialFeature: Math.random() < FACIAL_FEATURE_CHANCE ? pickRandom(FACIAL_FEATURES) : FacialFeature.None,
     skinColor: pickRandom(SKIN_COLORS),
     hairColor: pickRandom(HAIR_COLORS)
   };
