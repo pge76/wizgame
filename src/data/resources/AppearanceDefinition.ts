@@ -11,13 +11,10 @@ export enum BodyShape {
 export enum HairStyle {
   Bald,
   Messy,
-  Ponytail,
   Mohawk,
   Bun,
   LongStraight,
-  Buzz,
   Curly,
-  Braided,
   SidePart
 }
 
@@ -27,7 +24,6 @@ export enum EyeStyle {
   Almond,
   Asymmetric,
   DeepSet,
-  Tired,
   Slit,
   Magic,
   WideSet,
@@ -36,15 +32,12 @@ export enum EyeStyle {
 
 export enum FacialFeature {
   None,
-  Scar,
   EyePatch,
   Freckles,
-  Bandage,
   Tattoo,
   Mole,
   MissingTooth,
   Piercing,
-  BurnMark,
   Monocle
 }
 
@@ -63,13 +56,10 @@ export const BODY_SHAPES: readonly BodyShape[] = [BodyShape.Pill, BodyShape.Wide
 export const HAIR_STYLES: readonly HairStyle[] = [
   HairStyle.Bald,
   HairStyle.Messy,
-  HairStyle.Ponytail,
   HairStyle.Mohawk,
   HairStyle.Bun,
   HairStyle.LongStraight,
-  HairStyle.Buzz,
   HairStyle.Curly,
-  HairStyle.Braided,
   HairStyle.SidePart
 ];
 export const EYE_STYLES: readonly EyeStyle[] = [
@@ -78,7 +68,6 @@ export const EYE_STYLES: readonly EyeStyle[] = [
   EyeStyle.Almond,
   EyeStyle.Asymmetric,
   EyeStyle.DeepSet,
-  EyeStyle.Tired,
   EyeStyle.Slit,
   EyeStyle.Magic,
   EyeStyle.WideSet,
@@ -87,15 +76,12 @@ export const EYE_STYLES: readonly EyeStyle[] = [
 
 /** Excludes None — callers roll None separately so most pawns stay feature-free. */
 export const FACIAL_FEATURES: readonly FacialFeature[] = [
-  FacialFeature.Scar,
   FacialFeature.EyePatch,
   FacialFeature.Freckles,
-  FacialFeature.Bandage,
   FacialFeature.Tattoo,
   FacialFeature.Mole,
   FacialFeature.MissingTooth,
   FacialFeature.Piercing,
-  FacialFeature.BurnMark,
   FacialFeature.Monocle
 ];
 

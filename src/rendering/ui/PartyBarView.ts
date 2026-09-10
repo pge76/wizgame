@@ -3,7 +3,31 @@ import type { EntityId } from "@entities/Entity";
 import { AppearanceComponent } from "@entities/components/AppearanceComponent";
 import { StatsComponent } from "@entities/components/StatsComponent";
 import { Party, PARTY_SIZE } from "@entities/Party";
+import {
+  BodyShape,
+  EyeStyle,
+  FacialFeature,
+  HairStyle,
+  HeadShape,
+  type AppearanceDefinition
+} from "@data/resources/AppearanceDefinition";
 import { buildPortraitSvg } from "./PortraitSvg";
+
+function toHex(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+/** Debug-only: dumps the trait ids composing a portrait, shown as a hover tooltip. */
+function describeAppearance(appearance: AppearanceDefinition): string {
+  return [
+    `Head: ${HeadShape[appearance.headShape]}`,
+    `Body: ${BodyShape[appearance.bodyShape]}`,
+    `Hair: ${HairStyle[appearance.hairStyle]} (${toHex(appearance.hairColor)})`,
+    `Eyes: ${EyeStyle[appearance.eyeStyle]}`,
+    `Feature: ${FacialFeature[appearance.facialFeature]}`,
+    `Skin: ${toHex(appearance.skinColor)}`
+  ].join("\n");
+}
 
 const SLOTS_PER_SIDE = PARTY_SIZE / 2;
 
@@ -15,6 +39,7 @@ const SLOTS_PER_SIDE = PARTY_SIZE / 2;
 export class PartyBarView {
   readonly element: HTMLDivElement;
   private readonly slots: HTMLDivElement[] = [];
+  private readonly debugTooltip: HTMLDivElement;
 
   constructor(
     private readonly manager: EntityManager,
@@ -26,6 +51,11 @@ export class PartyBarView {
     const leftSide = this.buildSide("left");
     const rightSide = this.buildSide("right");
     this.element.append(leftSide, rightSide);
+
+    this.debugTooltip = document.createElement("div");
+    this.debugTooltip.className = "party-bar__debug-tooltip";
+    this.debugTooltip.hidden = true;
+    this.element.appendChild(this.debugTooltip);
   }
 
   private buildSide(side: "left" | "right"): HTMLDivElement {
@@ -36,11 +66,36 @@ export class PartyBarView {
     for (let slot = startSlot; slot < startSlot + SLOTS_PER_SIDE; slot++) {
       const slotEl = document.createElement("div");
       slotEl.className = "party-bar__slot";
+      slotEl.addEventListener("mouseenter", () => this.showDebugTooltip(slotEl, side));
+      slotEl.addEventListener("mouseleave", () => {
+        this.debugTooltip.hidden = true;
+      });
       this.slots[slot] = slotEl;
       sideEl.appendChild(slotEl);
     }
 
     return sideEl;
+  }
+
+  private showDebugTooltip(slotEl: HTMLDivElement, side: "left" | "right"): void {
+    const text = slotEl.dataset.debug;
+    if (!text) {
+      return;
+    }
+
+    this.debugTooltip.textContent = text;
+    this.debugTooltip.hidden = false;
+
+    const slotRect = slotEl.getBoundingClientRect();
+    const barRect = this.element.getBoundingClientRect();
+    this.debugTooltip.style.top = `${slotRect.top - barRect.top}px`;
+    if (side === "left") {
+      this.debugTooltip.style.left = `${slotRect.right - barRect.left + 8}px`;
+      this.debugTooltip.style.right = "auto";
+    } else {
+      this.debugTooltip.style.right = `${barRect.right - slotRect.left + 8}px`;
+      this.debugTooltip.style.left = "auto";
+    }
   }
 
   /** Highlights the slot for `id` (e.g. the current battle turn, or the overworld leader). Pass null to clear. */
@@ -59,7 +114,14 @@ export class PartyBarView {
       const slotEl = this.slots[slot]!;
       slotEl.replaceChildren();
 
-      const portrait = id === null ? null : this.renderPortrait(id);
+      const appearance = id === null ? undefined : this.manager.getComponent(id, AppearanceComponent);
+      if (appearance) {
+        slotEl.dataset.debug = describeAppearance(appearance.appearance);
+      } else {
+        delete slotEl.dataset.debug;
+      }
+
+      const portrait = appearance ? buildPortraitSvg(appearance.appearance) : null;
       if (portrait) {
         slotEl.appendChild(portrait);
       }
@@ -79,14 +141,5 @@ export class PartyBarView {
     fill.style.width = `${Math.max(0, (currentHP / maxHP) * 100)}%`;
     bar.appendChild(fill);
     return bar;
-  }
-
-  private renderPortrait(id: EntityId): SVGSVGElement | null {
-    const appearance = this.manager.getComponent(id, AppearanceComponent);
-    if (!appearance) {
-      return null;
-    }
-
-    return buildPortraitSvg(appearance.appearance);
   }
 }

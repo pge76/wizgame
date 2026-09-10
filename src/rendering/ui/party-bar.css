@@ -41,6 +41,7 @@
   background: rgba(17, 17, 22, 0.85);
   border: 1px solid #4a4a55;
   border-radius: 6px;
+  pointer-events: auto;
 }
 
 .party-bar__slot--active {
@@ -67,4 +68,22 @@
 .party-bar__hp-fill {
   height: 100%;
   background: #4caf50;
+}
+
+.party-bar__debug-tooltip {
+  position: absolute;
+  white-space: pre-line;
+  background: rgba(10, 10, 14, 0.95);
+  border: 1px solid #cba135;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: 11px "Consolas", "Courier New", monospace;
+  color: #f0d9a0;
+  pointer-events: none;
+  z-index: 20;
+  width: max-content;
+}
+
+.party-bar__debug-tooltip[hidden] {
+  display: none;
 }

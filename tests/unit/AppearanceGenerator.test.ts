@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { randomAppearance } from "@data/generation/AppearanceGenerator";
 import {
-  BODY_SHAPE_IDS,
-  EYE_STYLE_IDS,
+  BODY_SHAPES,
+  EYE_STYLES,
+  FACIAL_FEATURES,
+  FacialFeature,
   HAIR_COLORS,
-  HAIR_STYLE_IDS,
-  HEAD_SHAPE_IDS,
+  HAIR_STYLES,
+  HEAD_SHAPES,
   SKIN_COLORS
 } from "@data/resources/AppearanceDefinition";
 
@@ -14,12 +16,13 @@ describe("randomAppearance", () => {
     for (let i = 0; i < 50; i++) {
       const appearance = randomAppearance();
 
-      expect(HEAD_SHAPE_IDS).toContain(appearance.headShapeId);
-      expect(BODY_SHAPE_IDS).toContain(appearance.bodyShapeId);
-      expect(HAIR_STYLE_IDS).toContain(appearance.hairStyleId);
-      expect(EYE_STYLE_IDS).toContain(appearance.eyeStyleId);
+      expect(HEAD_SHAPES).toContain(appearance.headShape);
+      expect(BODY_SHAPES).toContain(appearance.bodyShape);
+      expect(HAIR_STYLES).toContain(appearance.hairStyle);
+      expect(EYE_STYLES).toContain(appearance.eyeStyle);
       expect(SKIN_COLORS).toContain(appearance.skinColor);
       expect(HAIR_COLORS).toContain(appearance.hairColor);
+      expect([FacialFeature.None, ...FACIAL_FEATURES]).toContain(appearance.facialFeature);
     }
   });
 });
