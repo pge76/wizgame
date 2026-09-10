@@ -22,6 +22,11 @@
   box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
 }
 
+.character-sheet__scroll {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
 .character-sheet__close {
   position: absolute;
   top: 12px;
@@ -123,10 +128,12 @@
 }
 
 .character-sheet__inventory {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(8, 96px);
   gap: 12px;
   margin-top: 24px;
   padding-top: 24px;
   border-top: 1px solid #4a4a55;
+  max-height: calc(5 * 72px + 4 * 12px);
+  overflow-y: auto;
 }

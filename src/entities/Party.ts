@@ -1,7 +1,7 @@
 import type { EntityId } from "./Entity";
 
 export const PARTY_SIZE = 6;
-export const PARTY_INVENTORY_SIZE = 16;
+export const PARTY_INVENTORY_SIZE = 100;
 
 export class Party {
   private readonly memberIds: (EntityId | null)[] = new Array(PARTY_SIZE).fill(null);

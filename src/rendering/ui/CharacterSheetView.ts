@@ -51,13 +51,17 @@ export class CharacterSheetView {
     this.panel.className = "character-sheet__panel";
     this.panel.appendChild(this.buildCloseButton());
 
+    const scroll = document.createElement("div");
+    scroll.className = "character-sheet__scroll";
+    this.panel.appendChild(scroll);
+
     this.body = document.createElement("div");
     this.body.className = "character-sheet__body";
-    this.panel.appendChild(this.body);
+    scroll.appendChild(this.body);
 
     this.inventory = document.createElement("div");
     this.inventory.className = "character-sheet__inventory";
-    this.panel.appendChild(this.inventory);
+    scroll.appendChild(this.inventory);
 
     this.element.appendChild(this.panel);
 
