@@ -54,6 +54,13 @@ const GRID_HEIGHT = 80;
 const BANTARI_ID = "pawn.bantari";
 const FLEE_HP_RATIO = 0.3;
 
+const WASD_DIRECTIONS: Record<string, GridPos> = {
+  KeyW: { x: 0, y: -1 },
+  KeyS: { x: 0, y: 1 },
+  KeyA: { x: -1, y: 0 },
+  KeyD: { x: 1, y: 0 }
+};
+
 function manhattan(a: GridPos, b: GridPos): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
@@ -98,6 +105,7 @@ export class Game {
   private battleReturnPositions = new Map<EntityId, GridPos>();
   private worldMonsterEntityId?: EntityId;
   private gameOver = false;
+  private readonly heldMovementKeys = new Set<string>();
 
   async start(mountEl: HTMLElement): Promise<void> {
     this.tileRegistry.register(TILE_FLOOR);
@@ -191,6 +199,14 @@ export class Game {
       this.openCharacterSheet(Number(match[1]) - 1);
     });
 
+    window.addEventListener("keydown", (event) => {
+      if (!(event.code in WASD_DIRECTIONS)) return;
+      this.heldMovementKeys.add(event.code);
+    });
+    window.addEventListener("keyup", (event) => {
+      this.heldMovementKeys.delete(event.code);
+    });
+
     this.loop = new GameLoop(
       (dt) => this.update(dt),
       () => this.render()
@@ -253,10 +269,53 @@ export class Game {
     const transform = this.entityManager.getComponent(this.playerEntityId, TransformComponent);
     if (!transform) return;
 
+    if (this.isWorldMonsterReachableAt(target, transform.position)) {
+      this.triggerWorldMonsterBattle();
+      return;
+    }
+
     const path = findPath(this.grid, this.tileRegistry, transform.position, target);
     if (!path || path.length === 0) return;
 
     this.entityManager.addComponent(this.playerEntityId, MovementComponent, new MovementComponent(path));
+  }
+
+  /** True if `target` is the world monster's tile and it can actually be walked to (ignoring the monster's own occupancy). */
+  private isWorldMonsterReachableAt(target: GridPos, from: GridPos): boolean {
+    if (this.worldMonsterEntityId === undefined) return false;
+
+    const monsterPos = this.entityManager.getComponent(this.worldMonsterEntityId, TransformComponent)?.position;
+    if (!monsterPos || monsterPos.x !== target.x || monsterPos.y !== target.y) return false;
+
+    const cell = this.grid.getCell(monsterPos);
+    const previousOccupant = cell.occupantEntityId;
+    cell.occupantEntityId = null;
+    const path = findPath(this.grid, this.tileRegistry, from, target);
+    cell.occupantEntityId = previousOccupant;
+
+    return path !== null;
+  }
+
+  private triggerWorldMonsterBattle(): void {
+    if (this.worldMonsterEntityId === undefined) return;
+
+    const monsterPos = this.entityManager.getComponent(this.worldMonsterEntityId, TransformComponent)?.position;
+    if (monsterPos) this.grid.getCell(monsterPos).occupantEntityId = null;
+    this.entityManager.destroyEntity(this.worldMonsterEntityId);
+    this.worldMonsterEntityId = undefined;
+    this.startBattle([BANTARI_ID]);
+  }
+
+  /** Steps the player one tile per held WASD key, once its current move has finished. */
+  private updateWasdMovement(): void {
+    if (this.heldMovementKeys.size === 0 || this.entityManager.hasComponent(this.playerEntityId, MovementComponent)) return;
+
+    const code = [...this.heldMovementKeys].pop()!;
+    const direction = WASD_DIRECTIONS[code]!;
+    const transform = this.entityManager.getComponent(this.playerEntityId, TransformComponent);
+    if (!transform) return;
+
+    this.commandPlayerMove({ x: transform.position.x + direction.x, y: transform.position.y + direction.y });
   }
 
   private followPlayerCamera(): void {
@@ -280,9 +339,9 @@ export class Game {
       for (const system of this.overworldSystems) {
         system.update(dt, this.entityManager, this.grid);
       }
+      this.updateWasdMovement();
       this.followPlayerCamera();
       this.checkEncounterZones();
-      this.checkWorldMonsterEncounter();
     } else if (this.battleGrid) {
       for (const system of this.battleSystems) {
         system.update(dt, this.entityManager, this.battleGrid);
@@ -709,22 +768,6 @@ export class Game {
       const encounterTable = getEncounterTable(zone.encounterTableId);
       this.startBattle(rollEncounter(encounterTable));
     }
-  }
-
-  private checkWorldMonsterEncounter(): void {
-    if (this.mode !== GameMode.Overworld || this.worldMonsterEntityId === undefined) return;
-
-    const leaderPos = this.entityManager.getComponent(this.playerEntityId, TransformComponent)?.position;
-    const monsterPos = this.entityManager.getComponent(this.worldMonsterEntityId, TransformComponent)?.position;
-    if (!leaderPos || !monsterPos) return;
-
-    const distance = Math.abs(leaderPos.x - monsterPos.x) + Math.abs(leaderPos.y - monsterPos.y);
-    if (distance > 1) return;
-
-    this.grid.getCell(monsterPos).occupantEntityId = null;
-    this.entityManager.destroyEntity(this.worldMonsterEntityId);
-    this.worldMonsterEntityId = undefined;
-    this.startBattle([BANTARI_ID]);
   }
 
   private startBattle(enemyPawnIds: string[]): void {
