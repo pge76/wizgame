@@ -7,8 +7,11 @@ import { FactionComponent } from "@entities/components/FactionComponent";
 import { BattleParticipantComponent } from "@entities/components/BattleParticipantComponent";
 import { AttackAnimationComponent } from "@entities/components/AttackAnimationComponent";
 import { Faction } from "@data/resources/PawnDefinition";
+import type { ItemDefinition } from "@data/resources/ItemDefinition";
+import type { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import type { System } from "@systems/System";
 import { BattleOutcome, BattleState } from "./BattleState";
+import { getEffectiveDefense, getEquippedWeapon, rollDamage } from "./CombatFormulas";
 
 function isAlive(manager: EntityManager, id: EntityId): boolean {
   return (manager.getComponent(id, StatsComponent)?.currentHP ?? 0) > 0;
@@ -17,6 +20,7 @@ function isAlive(manager: EntityManager, id: EntityId): boolean {
 export class BattleSystem implements System {
   constructor(
     private readonly state: BattleState,
+    private readonly itemRegistry: ResourceRegistry<ItemDefinition>,
     private readonly onOutcome: (outcome: BattleOutcome) => void,
     private readonly onAttack: (attackerId: EntityId, targetId: EntityId, attackStat: number, defenseStat: number, damage: number) => void
   ) {}
@@ -44,10 +48,27 @@ export class BattleSystem implements System {
 
     manager.addComponent(attackerId, AttackAnimationComponent, new AttackAnimationComponent(targetPos));
 
-    const attackValue = Math.max(0, attackerStats.attack - targetStats.defense);
-    const damage = 1 + attackValue;
+    const weapon = getEquippedWeapon(manager, this.itemRegistry, attackerId);
+    const effectiveDefense = getEffectiveDefense(manager, this.itemRegistry, targetId);
+
+    let attackValueForLog: number;
+    let damage: number;
+    if (weapon) {
+      // Armed combatants (currently: PCs with an equipped weapon) roll the weapon's own damage
+      // dice plus its enchantment bonus, mitigated by the target's effective (armor-inclusive)
+      // defense — closer to Wizardry 7's weapon-driven damage than the flat unarmed formula below.
+      const roll = rollDamage(weapon.damageMin, weapon.damageMax) + weapon.attackBonus;
+      damage = Math.max(1, roll - effectiveDefense);
+      attackValueForLog = roll;
+    } else {
+      // Unarmed (all current monsters): unchanged flat formula.
+      const attackValue = Math.max(0, attackerStats.attack - effectiveDefense);
+      damage = 1 + attackValue;
+      attackValueForLog = attackerStats.attack;
+    }
+
     targetStats.currentHP -= damage;
-    this.onAttack(attackerId, targetId, attackerStats.attack, targetStats.defense, damage);
+    this.onAttack(attackerId, targetId, attackValueForLog, effectiveDefense, damage);
 
     if (targetStats.currentHP <= 0) {
       grid.getCell(targetPos).occupantEntityId = null;

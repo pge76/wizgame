@@ -1,0 +1,8 @@
+{
+  "id": "item.armor.chainmail",
+  "displayName": "Chainmail",
+  "kind": "armor",
+  "stackable": false,
+  "equipSlot": "torso",
+  "defenseBonus": 3
+}

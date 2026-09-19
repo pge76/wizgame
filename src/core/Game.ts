@@ -8,7 +8,7 @@ import { MovementComponent } from "@entities/components/MovementComponent";
 import { AttackAnimationComponent } from "@entities/components/AttackAnimationComponent";
 import { StatsComponent } from "@entities/components/StatsComponent";
 import { ExperienceComponent } from "@entities/components/ExperienceComponent";
-import { EquipmentComponent } from "@entities/components/EquipmentComponent";
+import { EquipmentComponent, EquipmentSlot } from "@entities/components/EquipmentComponent";
 import { FactionComponent } from "@entities/components/FactionComponent";
 import { BattleParticipantComponent } from "@entities/components/BattleParticipantComponent";
 import { PlayerAiBehaviorComponent } from "@entities/components/PlayerAiBehaviorComponent";
@@ -31,6 +31,9 @@ import { TEST_ENCOUNTER_ZONES, type EncounterZone } from "@data/maps/EncounterZo
 import { Faction, PAWN_HUMANOID, type PawnDefinition } from "@data/resources/PawnDefinition";
 import { PAWN_BANDIT, PAWN_RAT } from "@data/resources/EnemyPawnDefinitions";
 import { MONSTER_DEFINITIONS } from "@data/loaders/MonsterDefinitionLoader";
+import type { ItemDefinition } from "@data/resources/ItemDefinition";
+import { ITEM_DEFINITIONS } from "@data/loaders/ItemDefinitionLoader";
+import { equipItemFromInventory, unequipToInventory } from "@entities/EquipmentActions";
 import { preloadMonsterTextures } from "@rendering/pawn/MonsterTextureLoader";
 import { randomAppearance } from "@data/generation/AppearanceGenerator";
 import { MovementSystem } from "@systems/MovementSystem";
@@ -73,6 +76,7 @@ enum GameMode {
 export class Game {
   private readonly tileRegistry = new ResourceRegistry<TileDefinition>();
   private readonly pawnRegistry = new ResourceRegistry<PawnDefinition>();
+  private readonly itemRegistry = new ResourceRegistry<ItemDefinition>();
   private readonly entityManager = new EntityManager();
   private readonly grid = new Grid(GRID_WIDTH, GRID_HEIGHT, TILE_GRASS.id);
   private readonly overworldSystems: System[] = [];
@@ -120,6 +124,9 @@ export class Game {
     for (const monsterDefinition of MONSTER_DEFINITIONS) {
       this.pawnRegistry.register(monsterDefinition);
     }
+    for (const itemDefinition of ITEM_DEFINITIONS) {
+      this.itemRegistry.register(itemDefinition);
+    }
     await preloadMonsterTextures();
 
     const cityOrigin = {
@@ -133,6 +140,7 @@ export class Game {
     this.battleSystems.push(movementSystem);
     this.battleSystem = new BattleSystem(
       this.battleState,
+      this.itemRegistry,
       (outcome) => this.endBattle(outcome),
       (attackerId, targetId, attackStat, defenseStat, damage) => this.logAttack(attackerId, targetId, attackStat, defenseStat, damage)
     );
@@ -146,6 +154,7 @@ export class Game {
     );
 
     this.spawnSamplePawns({ x: cityOrigin.x + 28, y: cityOrigin.y + 28 });
+    this.seedStarterInventory();
     this.spawnWorldMonster({ x: cityOrigin.x + 24, y: cityOrigin.y + 22 });
 
     await this.renderer.init(mountEl);
@@ -159,7 +168,14 @@ export class Game {
     mountEl.appendChild(this.partyBarView.element);
     this.partyBarView.sync();
 
-    this.characterSheetView = new CharacterSheetView(this.entityManager, this.pawnRegistry, this.party);
+    this.characterSheetView = new CharacterSheetView(
+      this.entityManager,
+      this.pawnRegistry,
+      this.itemRegistry,
+      this.party,
+      (entityId, inventorySlot) => equipItemFromInventory(this.entityManager, this.itemRegistry, this.party, entityId, inventorySlot),
+      (entityId, slot) => unequipToInventory(this.entityManager, this.party, entityId, slot)
+    );
     mountEl.appendChild(this.characterSheetView.element);
 
     this.battleHudView = new BattleHudView(this.entityManager, this.pawnRegistry);
@@ -233,7 +249,9 @@ export class Game {
       );
       this.entityManager.addComponent(id, FactionComponent, new FactionComponent(PAWN_HUMANOID.faction));
       this.entityManager.addComponent(id, ExperienceComponent, new ExperienceComponent(0, 100));
-      this.entityManager.addComponent(id, EquipmentComponent, new EquipmentComponent());
+      const equipment = new EquipmentComponent();
+      equipment.slots[EquipmentSlot.RightHand] = "item.weapon.dagger";
+      this.entityManager.addComponent(id, EquipmentComponent, equipment);
       this.party.setMember(index, id);
 
       if (index === 0) {
@@ -241,6 +259,25 @@ export class Game {
         this.grid.getCell(position).occupantEntityId = id;
       }
     });
+  }
+
+  /** Drops a spread of the sample weapons/armor into the shared party inventory for testing. */
+  private seedStarterInventory(): void {
+    const starterItemIds = [
+      "item.weapon.main-gauche",
+      "item.weapon.rapier",
+      "item.weapon.long-sword",
+      "item.weapon.broad-sword",
+      "item.weapon.mace",
+      "item.weapon.war-hammer",
+      "item.weapon.claymore",
+      "item.armor.leather-cap",
+      "item.armor.leather-armor",
+      "item.armor.leather-leggings",
+      "item.armor.chainmail",
+      "item.armor.plate-mail"
+    ];
+    starterItemIds.forEach((itemId, slot) => this.party.setInventorySlot(slot, itemId));
   }
 
   private spawnWorldMonster(position: GridPos): void {

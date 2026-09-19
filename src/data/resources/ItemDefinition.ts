@@ -1,5 +1,43 @@
 import type { ResourceDefinition } from "./ResourceDefinition";
+import type { EquipmentSlot } from "@entities/components/EquipmentComponent";
 
-export interface ItemDefinition extends ResourceDefinition {
+export enum ItemKind {
+  Weapon,
+  Armor,
+  Misc
+}
+
+/** Hand: goes in either EquipmentSlot.LeftHand or EquipmentSlot.RightHand (dual-wieldable).
+ *  Ranged: goes in the fixed EquipmentSlot.Ranged slot. */
+export enum WeaponSlotKind {
+  Hand,
+  Ranged
+}
+
+interface BaseItemDefinition extends ResourceDefinition {
+  readonly kind: ItemKind;
   readonly stackable: boolean;
 }
+
+/** Damage is rolled as `damageMin`-`damageMax` per hit, plus the flat `attackBonus` enchantment
+ *  modifier (mirrors Wizardry 7's "(+1)"/"(+2)" notation) — see BattleSystem.resolveMeleeAttack. */
+export interface WeaponDefinition extends BaseItemDefinition {
+  readonly kind: ItemKind.Weapon;
+  readonly slotKind: WeaponSlotKind;
+  readonly twoHanded: boolean;
+  readonly damageMin: number;
+  readonly damageMax: number;
+  readonly attackBonus: number;
+}
+
+export interface ArmorDefinition extends BaseItemDefinition {
+  readonly kind: ItemKind.Armor;
+  readonly equipSlot: EquipmentSlot;
+  readonly defenseBonus: number;
+}
+
+export interface MiscItemDefinition extends BaseItemDefinition {
+  readonly kind: ItemKind.Misc;
+}
+
+export type ItemDefinition = WeaponDefinition | ArmorDefinition | MiscItemDefinition;

@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.broad-sword",
+  "displayName": "Broad Sword",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": false,
+  "damageMin": 3,
+  "damageMax": 8,
+  "attackBonus": 0
+}

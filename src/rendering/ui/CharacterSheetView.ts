@@ -8,7 +8,22 @@ import { ExperienceComponent } from "@entities/components/ExperienceComponent";
 import { EquipmentComponent, EquipmentSlot } from "@entities/components/EquipmentComponent";
 import type { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import type { PawnDefinition } from "@data/resources/PawnDefinition";
+import { ItemKind, type ItemDefinition } from "@data/resources/ItemDefinition";
 import { buildFullPortraitSvg } from "./PortraitSvg";
+
+/** "Dagger (1-4)", "Rapier (1-7+1)", "Leather Armor (+2)" — compact stat suffix per item kind. */
+function formatItemLabel(item: ItemDefinition): string {
+  switch (item.kind) {
+    case ItemKind.Weapon: {
+      const bonus = item.attackBonus > 0 ? `+${item.attackBonus}` : "";
+      return `${item.displayName} (${item.damageMin}-${item.damageMax}${bonus})`;
+    }
+    case ItemKind.Armor:
+      return `${item.displayName} (+${item.defenseBonus})`;
+    case ItemKind.Misc:
+      return item.displayName;
+  }
+}
 
 const LEFT_SLOTS = [EquipmentSlot.Head, EquipmentSlot.Neck, EquipmentSlot.Cloak, EquipmentSlot.Torso, EquipmentSlot.Legs];
 const RIGHT_SLOTS = [EquipmentSlot.Ring, EquipmentSlot.Gloves, EquipmentSlot.Boots, EquipmentSlot.Ranged, EquipmentSlot.Munition];
@@ -29,19 +44,28 @@ const SLOT_LABELS: Record<EquipmentSlot, string> = {
   [EquipmentSlot.Neck]: "Neck"
 };
 
-/** Centered overlay showing one party member's portrait, equipment paperdoll, and stats. */
+/** Centered overlay showing one party member's portrait, equipment paperdoll, and stats.
+ *
+ *  Equipment and inventory slot elements are built once and updated in place on `sync()`, rather
+ *  than being torn down and rebuilt every frame (`sync()` runs on every render tick while visible):
+ *  rebuilding would detach their click listeners mid-gesture on a slow tap/click, the same class of
+ *  bug the persistent close button already works around. */
 export class CharacterSheetView {
   readonly element: HTMLDivElement;
   private entityId: EntityId | null = null;
   private readonly panel: HTMLDivElement;
-  private readonly body: HTMLDivElement;
-
-  private readonly inventory: HTMLDivElement;
+  private readonly portraitWrap: HTMLDivElement;
+  private readonly statsColumn: HTMLDivElement;
+  private readonly equipSlotElements = new Map<EquipmentSlot, HTMLDivElement>();
+  private readonly inventorySlotElements: HTMLDivElement[];
 
   constructor(
     private readonly manager: EntityManager,
     private readonly pawnRegistry: ResourceRegistry<PawnDefinition>,
-    private readonly party: Party
+    private readonly itemRegistry: ResourceRegistry<ItemDefinition>,
+    private readonly party: Party,
+    private readonly onEquipFromInventory: (entityId: EntityId, inventorySlot: number) => void,
+    private readonly onUnequip: (entityId: EntityId, slot: EquipmentSlot) => void
   ) {
     this.element = document.createElement("div");
     this.element.className = "character-sheet";
@@ -55,13 +79,36 @@ export class CharacterSheetView {
     scroll.className = "character-sheet__scroll";
     this.panel.appendChild(scroll);
 
-    this.body = document.createElement("div");
-    this.body.className = "character-sheet__body";
-    scroll.appendChild(this.body);
+    const body = document.createElement("div");
+    body.className = "character-sheet__body";
+    scroll.appendChild(body);
 
-    this.inventory = document.createElement("div");
-    this.inventory.className = "character-sheet__inventory";
-    scroll.appendChild(this.inventory);
+    this.portraitWrap = document.createElement("div");
+    this.portraitWrap.className = "character-sheet__portrait-wrap";
+
+    const portraitColumn = document.createElement("div");
+    portraitColumn.className = "character-sheet__portrait-column";
+    portraitColumn.appendChild(this.buildSlotList(LEFT_SLOTS));
+    portraitColumn.appendChild(this.portraitWrap);
+    portraitColumn.appendChild(this.buildSlotList(RIGHT_SLOTS));
+
+    const hands = document.createElement("div");
+    hands.className = "character-sheet__hand-slots";
+    for (const slot of HAND_SLOTS) hands.appendChild(this.createEquipSlotElement(slot));
+    portraitColumn.appendChild(hands);
+    body.appendChild(portraitColumn);
+
+    this.statsColumn = document.createElement("div");
+    this.statsColumn.className = "character-sheet__stats-column";
+    body.appendChild(this.statsColumn);
+
+    const inventory = document.createElement("div");
+    inventory.className = "character-sheet__inventory";
+    this.inventorySlotElements = this.party
+      .getInventory()
+      .map((_itemId, inventorySlot) => this.createInventorySlotElement(inventorySlot));
+    inventory.append(...this.inventorySlotElements);
+    scroll.appendChild(inventory);
 
     this.element.appendChild(this.panel);
 
@@ -85,7 +132,7 @@ export class CharacterSheetView {
     return !this.element.hidden;
   }
 
-  /** Re-renders the currently open sheet. No-op while hidden. */
+  /** Re-renders the currently open sheet's dynamic content. No-op while hidden. */
   sync(): void {
     if (this.entityId === null) return;
     const id = this.entityId;
@@ -102,22 +149,25 @@ export class CharacterSheetView {
 
     const attributes = this.pawnRegistry.get(pawn.pawnDefinitionId).attributes;
 
-    this.body.replaceChildren();
-    this.body.appendChild(this.buildPortraitColumn(appearance.appearance, equipment));
-    this.body.appendChild(this.buildStatsColumn(stats, experience, attributes));
+    this.portraitWrap.replaceChildren(buildFullPortraitSvg(appearance.appearance));
+    this.syncStatsColumn(stats, experience, attributes);
 
-    this.inventory.replaceChildren(...this.buildInventorySlots());
+    for (const [slot, slotEl] of this.equipSlotElements) {
+      this.syncSlotElement(slotEl, equipment?.slots[slot] ?? null, SLOT_LABELS[slot]);
+    }
+
+    const inventoryItemIds = this.party.getInventory();
+    this.inventorySlotElements.forEach((slotEl, index) => {
+      this.syncSlotElement(slotEl, inventoryItemIds[index] ?? null, "");
+    });
   }
 
-  /** Shared party inventory — every party member sees the same items. */
-  private buildInventorySlots(): HTMLDivElement[] {
-    return this.party.getInventory().map((itemId) => {
-      const slotEl = document.createElement("div");
-      slotEl.className = "character-sheet__slot";
-      slotEl.textContent = itemId ?? "";
-      if (!itemId) slotEl.classList.add("character-sheet__slot--empty");
-      return slotEl;
-    });
+  /** Applies the current item (or empty placeholder) to an already-built slot element. */
+  private syncSlotElement(slotEl: HTMLDivElement, itemId: string | null, emptyLabel: string): void {
+    const item = itemId && this.itemRegistry.has(itemId) ? this.itemRegistry.get(itemId) : null;
+    slotEl.textContent = item ? formatItemLabel(item) : emptyLabel;
+    slotEl.classList.toggle("character-sheet__slot--empty", !item);
+    slotEl.classList.toggle("character-sheet__slot--interactive", item !== null && item.kind !== ItemKind.Misc);
   }
 
   private buildCloseButton(): HTMLButtonElement {
@@ -128,81 +178,68 @@ export class CharacterSheetView {
     return button;
   }
 
-  private buildPortraitColumn(
-    appearance: Parameters<typeof buildFullPortraitSvg>[0],
-    equipment: EquipmentComponent | undefined
-  ): HTMLDivElement {
-    const column = document.createElement("div");
-    column.className = "character-sheet__portrait-column";
-
-    column.appendChild(this.buildSlotList(LEFT_SLOTS, equipment));
-
-    const portraitWrap = document.createElement("div");
-    portraitWrap.className = "character-sheet__portrait-wrap";
-    portraitWrap.appendChild(buildFullPortraitSvg(appearance));
-    column.appendChild(portraitWrap);
-
-    column.appendChild(this.buildSlotList(RIGHT_SLOTS, equipment));
-
-    const hands = document.createElement("div");
-    hands.className = "character-sheet__hand-slots";
-    for (const slot of HAND_SLOTS) {
-      hands.appendChild(this.buildSlot(slot, equipment));
-    }
-    column.appendChild(hands);
-
-    return column;
-  }
-
-  private buildSlotList(slots: EquipmentSlot[], equipment: EquipmentComponent | undefined): HTMLDivElement {
+  private buildSlotList(slots: EquipmentSlot[]): HTMLDivElement {
     const list = document.createElement("div");
     list.className = "character-sheet__slot-list";
-    for (const slot of slots) {
-      list.appendChild(this.buildSlot(slot, equipment));
-    }
+    for (const slot of slots) list.appendChild(this.createEquipSlotElement(slot));
     return list;
   }
 
-  private buildSlot(slot: EquipmentSlot, equipment: EquipmentComponent | undefined): HTMLDivElement {
+  /** Built once per paperdoll slot; content is filled in later by sync()/syncSlotElement(). */
+  private createEquipSlotElement(slot: EquipmentSlot): HTMLDivElement {
     const slotEl = document.createElement("div");
-    slotEl.className = "character-sheet__slot";
-    const itemId = equipment?.slots[slot];
-    slotEl.textContent = itemId ?? SLOT_LABELS[slot];
-    if (!itemId) slotEl.classList.add("character-sheet__slot--empty");
+    slotEl.className = "character-sheet__slot character-sheet__slot--empty";
+    slotEl.textContent = SLOT_LABELS[slot];
+    slotEl.addEventListener("click", () => {
+      if (this.entityId !== null) this.onUnequip(this.entityId, slot);
+    });
+    this.equipSlotElements.set(slot, slotEl);
     return slotEl;
   }
 
-  private buildStatsColumn(
+  /** Built once per party inventory slot; content is filled in later by sync()/syncSlotElement().
+   *  Tapping an equippable item equips it onto the open character straight away (destination slot
+   *  picked automatically). */
+  private createInventorySlotElement(inventorySlot: number): HTMLDivElement {
+    const slotEl = document.createElement("div");
+    slotEl.className = "character-sheet__slot character-sheet__slot--empty";
+    slotEl.addEventListener("click", () => {
+      if (this.entityId !== null) this.onEquipFromInventory(this.entityId, inventorySlot);
+    });
+    return slotEl;
+  }
+
+  private syncStatsColumn(
     stats: StatsComponent,
     experience: ExperienceComponent | undefined,
     attributes: PawnDefinition["attributes"]
-  ): HTMLDivElement {
-    const column = document.createElement("div");
-    column.className = "character-sheet__stats-column";
-
-    column.appendChild(this.buildStatRow("Hit Points", `${stats.currentHP} / ${stats.maxHP}`));
-    column.appendChild(this.buildStatRow("Armor Class", `${stats.defense}`));
+  ): void {
+    const rows: [string, string][] = [
+      ["Hit Points", `${stats.currentHP} / ${stats.maxHP}`],
+      ["Armor Class", `${stats.defense}`]
+    ];
     if (experience) {
-      column.appendChild(this.buildStatRow("Experience", `${experience.currentExp}`));
-      column.appendChild(this.buildStatRow("Next Level", `${experience.expToNextLevel}`));
+      rows.push(["Experience", `${experience.currentExp}`], ["Next Level", `${experience.expToNextLevel}`]);
     }
+
+    this.statsColumn.replaceChildren(...rows.map(([label, value]) => this.buildStatRow(label, value)));
 
     if (attributes) {
       const divider = document.createElement("hr");
       divider.className = "character-sheet__divider";
-      column.appendChild(divider);
+      this.statsColumn.appendChild(divider);
 
-      column.appendChild(this.buildStatRow("Level", `${attributes.level}`));
-      column.appendChild(this.buildStatRow("Strength", `${attributes.strength}`));
-      column.appendChild(this.buildStatRow("Intelligence", `${attributes.intelligence}`));
-      column.appendChild(this.buildStatRow("Piety", `${attributes.piety}`));
-      column.appendChild(this.buildStatRow("Vitality", `${attributes.vitality}`));
-      column.appendChild(this.buildStatRow("Dexterity", `${attributes.dexterity}`));
-      column.appendChild(this.buildStatRow("Speed", `${attributes.speed}`));
-      column.appendChild(this.buildStatRow("Senses", `${attributes.senses}`));
+      this.statsColumn.append(
+        this.buildStatRow("Level", `${attributes.level}`),
+        this.buildStatRow("Strength", `${attributes.strength}`),
+        this.buildStatRow("Intelligence", `${attributes.intelligence}`),
+        this.buildStatRow("Piety", `${attributes.piety}`),
+        this.buildStatRow("Vitality", `${attributes.vitality}`),
+        this.buildStatRow("Dexterity", `${attributes.dexterity}`),
+        this.buildStatRow("Speed", `${attributes.speed}`),
+        this.buildStatRow("Senses", `${attributes.senses}`)
+      );
     }
-
-    return column;
   }
 
   private buildStatRow(label: string, value: string): HTMLDivElement {

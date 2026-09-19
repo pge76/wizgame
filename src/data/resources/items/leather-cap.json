@@ -1,0 +1,8 @@
+{
+  "id": "item.armor.leather-cap",
+  "displayName": "Leather Cap",
+  "kind": "armor",
+  "stackable": false,
+  "equipSlot": "head",
+  "defenseBonus": 1
+}

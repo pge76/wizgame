@@ -98,6 +98,14 @@
   color: #6a6a75;
 }
 
+.character-sheet__slot--interactive {
+  cursor: pointer;
+}
+
+.character-sheet__slot--interactive:hover {
+  border-color: #cba135;
+}
+
 .character-sheet__stats-column {
   display: flex;
   flex-direction: column;
