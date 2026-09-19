@@ -9,6 +9,7 @@ import { EquipmentComponent, EquipmentSlot } from "@entities/components/Equipmen
 import type { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import type { PawnDefinition } from "@data/resources/PawnDefinition";
 import { ItemKind, type ItemDefinition } from "@data/resources/ItemDefinition";
+import { getEffectiveDefense, getEquippedWeapon } from "@battle/CombatFormulas";
 import { buildFullPortraitSvg } from "./PortraitSvg";
 
 /** "Dagger (1-4)", "Rapier (1-7+1)", "Leather Armor (+2)" — compact stat suffix per item kind. */
@@ -150,7 +151,7 @@ export class CharacterSheetView {
     const attributes = this.pawnRegistry.get(pawn.pawnDefinitionId).attributes;
 
     this.portraitWrap.replaceChildren(buildFullPortraitSvg(appearance.appearance));
-    this.syncStatsColumn(stats, experience, attributes);
+    this.syncStatsColumn(id, stats, experience, attributes);
 
     for (const [slot, slotEl] of this.equipSlotElements) {
       this.syncSlotElement(slotEl, equipment?.slots[slot] ?? null, SLOT_LABELS[slot]);
@@ -210,13 +211,24 @@ export class CharacterSheetView {
   }
 
   private syncStatsColumn(
+    entityId: EntityId,
     stats: StatsComponent,
     experience: ExperienceComponent | undefined,
     attributes: PawnDefinition["attributes"]
   ): void {
+    const effectiveDefense = getEffectiveDefense(this.manager, this.itemRegistry, entityId);
+    const armorBonus = effectiveDefense - stats.defense;
+    const armorClassLabel = armorBonus > 0 ? `${effectiveDefense} (+${armorBonus})` : `${effectiveDefense}`;
+
+    const weapon = getEquippedWeapon(this.manager, this.itemRegistry, entityId);
+    const damageLabel = weapon
+      ? `${weapon.damageMin}-${weapon.damageMax}${weapon.attackBonus > 0 ? `+${weapon.attackBonus}` : ""}`
+      : "Unarmed";
+
     const rows: [string, string][] = [
       ["Hit Points", `${stats.currentHP} / ${stats.maxHP}`],
-      ["Armor Class", `${stats.defense}`]
+      ["Damage", damageLabel],
+      ["Armor Class", armorClassLabel]
     ];
     if (experience) {
       rows.push(["Experience", `${experience.currentExp}`], ["Next Level", `${experience.expToNextLevel}`]);
