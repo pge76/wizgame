@@ -15,6 +15,10 @@ export const UNARMED_WEAPON: Pick<WeaponDefinition, "damageMin" | "damageMax" | 
 /** Armor Class with nothing equipped. */
 export const BASE_ARMOR_CLASS = 0;
 
+/** Below this HP fraction, a combatant flees instead of engaging — shared by the player autobattle
+ *  AI (Game.resolveMeleeAiTurn) and the Skirmish enemy AI (EnemyAISystem.takeSkirmishTurn). */
+export const FLEE_HP_RATIO = 0.3;
+
 const ARMOR_SLOTS = [
   EquipmentSlot.Head,
   EquipmentSlot.Torso,

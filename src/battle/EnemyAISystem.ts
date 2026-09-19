@@ -11,6 +11,7 @@ import type { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import type { TileDefinition } from "@data/resources/TileDefinition";
 import { AiBehavior, Faction, type PawnDefinition } from "@data/resources/PawnDefinition";
 import type { BattleSystem } from "./BattleSystem";
+import { FLEE_HP_RATIO } from "./CombatFormulas";
 
 function manhattan(a: GridPos, b: GridPos): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -44,24 +45,33 @@ export class EnemyAISystem {
     const nearest = this.findNearestTarget(manager, enemyId);
     if (!nearest) return;
 
-    const pos = this.approach(manager, grid, enemyId, nearest.pos);
-    if (isAdjacent(grid, pos, nearest.pos)) {
-      this.battleSystem.resolveMeleeAttack(manager, enemyId, nearest.id, grid);
-    }
+    this.approachAndAttack(manager, grid, enemyId, nearest);
   }
 
-  /** Approach and attack like takeBasicTurn, then retreat out of melee range after landing a hit. */
+  /** Same as takeBasicTurn, except it retreats one step instead of engaging once its own HP drops
+   *  below FLEE_HP_RATIO — no longer retreats unconditionally after every hit (that produced the
+   *  "runs a lap around the target" look; simple approach-and-attack is the baseline for now). */
   private takeSkirmishTurn(manager: EntityManager, grid: Grid, enemyId: EntityId): void {
     const nearest = this.findNearestTarget(manager, enemyId);
     if (!nearest) return;
 
-    const pos = this.approach(manager, grid, enemyId, nearest.pos);
-    if (!isAdjacent(grid, pos, nearest.pos)) return;
+    const stats = manager.getComponent(enemyId, StatsComponent);
+    const isLowHp = !!stats && stats.currentHP / stats.maxHP < FLEE_HP_RATIO;
+    if (isLowHp) {
+      const pos = manager.getComponent(enemyId, TransformComponent)!.position;
+      this.retreat(manager, grid, enemyId, pos, nearest.pos);
+      return;
+    }
 
-    const attacked = this.battleSystem.resolveMeleeAttack(manager, enemyId, nearest.id, grid);
-    if (!attacked) return;
+    this.approachAndAttack(manager, grid, enemyId, nearest);
+  }
 
-    this.retreat(manager, grid, enemyId, pos, nearest.pos);
+  /** Moves adjacent to `target` if not already there, then attacks it once in range. */
+  private approachAndAttack(manager: EntityManager, grid: Grid, enemyId: EntityId, target: { id: EntityId; pos: GridPos }): void {
+    const pos = this.approach(manager, grid, enemyId, target.pos);
+    if (isAdjacent(grid, pos, target.pos)) {
+      this.battleSystem.resolveMeleeAttack(manager, enemyId, target.id, grid);
+    }
   }
 
   private findNearestTarget(manager: EntityManager, enemyId: EntityId): { id: EntityId; pos: GridPos } | null {
