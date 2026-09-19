@@ -1,0 +1,7 @@
+{
+  "id": "item.key.rusty-key",
+  "displayName": "Rusty Key",
+  "kind": "misc",
+  "stackable": false,
+  "miscClass": "key"
+}

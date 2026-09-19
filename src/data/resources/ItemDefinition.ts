@@ -45,8 +45,16 @@ export interface ArmorDefinition extends BaseItemDefinition {
   readonly defenseBonus: number;
 }
 
+/** Silhouette family for Misc items' icon (ItemIconSvg.ts) — purely visual, no gameplay effect.
+ *  A door's requiredItemId match is a plain id comparison and doesn't depend on this. */
+export enum MiscItemClass {
+  Generic,
+  Key
+}
+
 export interface MiscItemDefinition extends BaseItemDefinition {
   readonly kind: ItemKind.Misc;
+  readonly miscClass: MiscItemClass;
 }
 
 export type ItemDefinition = WeaponDefinition | ArmorDefinition | MiscItemDefinition;

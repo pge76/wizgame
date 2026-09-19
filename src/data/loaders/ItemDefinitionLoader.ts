@@ -1,4 +1,4 @@
-import { ItemKind, WeaponClass, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
+import { ItemKind, MiscItemClass, WeaponClass, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
 import { EquipmentSlot } from "@entities/components/EquipmentComponent";
 
 interface BaseItemJson {
@@ -27,6 +27,7 @@ interface ArmorJson extends BaseItemJson {
 
 interface MiscJson extends BaseItemJson {
   readonly kind: "misc";
+  readonly miscClass: "generic" | "key";
 }
 
 type ItemJson = WeaponJson | ArmorJson | MiscJson;
@@ -41,6 +42,11 @@ const WEAPON_CLASS_BY_NAME: Record<WeaponJson["weaponClass"], WeaponClass> = {
   sword: WeaponClass.Sword,
   blunt: WeaponClass.Blunt,
   ranged: WeaponClass.Ranged
+};
+
+const MISC_CLASS_BY_NAME: Record<MiscJson["miscClass"], MiscItemClass> = {
+  generic: MiscItemClass.Generic,
+  key: MiscItemClass.Key
 };
 
 const ARMOR_EQUIP_SLOT_BY_NAME: Record<ArmorEquipSlotName, EquipmentSlot> = {
@@ -92,13 +98,19 @@ function toItemDefinition(json: ItemJson): ItemDefinition {
         defenseBonus: json.defenseBonus
       };
     }
-    case "misc":
+    case "misc": {
+      const miscClass = MISC_CLASS_BY_NAME[json.miscClass];
+      if (miscClass === undefined) {
+        throw new Error(`Unknown miscClass "${json.miscClass}" in item definition "${json.id}".`);
+      }
       return {
         id: json.id,
         displayName: json.displayName,
         stackable: json.stackable,
-        kind: ItemKind.Misc
+        kind: ItemKind.Misc,
+        miscClass
       };
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { EquipmentSlot } from "@entities/components/EquipmentComponent";
-import { ItemKind, WeaponClass, type ItemDefinition } from "@data/resources/ItemDefinition";
+import { ItemKind, MiscItemClass, WeaponClass, type ItemDefinition } from "@data/resources/ItemDefinition";
 
 /**
  * Small procedurally-drawn vector icons for items (weapons by WeaponClass silhouette, armor by
@@ -14,6 +14,7 @@ const METAL_COLOR = "#c9c9c9";
 const GRIP_COLOR = "#6b4a2a";
 const ARMOR_COLOR = "#a07a3f";
 const GEM_COLOR = "#7fb0d0";
+const KEY_COLOR = "#b0703a";
 
 const VIEW_BOX = "0 0 24 24";
 
@@ -46,7 +47,9 @@ export function buildItemIconSvg(item: ItemDefinition): SVGSVGElement {
       ? drawWeaponIcon(item.weaponClass, item.twoHanded)
       : item.kind === ItemKind.Armor
         ? drawArmorIcon(item.equipSlot)
-        : drawGemIcon();
+        : item.miscClass === MiscItemClass.Key
+          ? drawKeyIcon()
+          : drawGemIcon();
 
   svg.appendChild(content);
   return svg;
@@ -136,4 +139,14 @@ function drawLegsIcon(): SVGElement {
 
 function drawGemIcon(): SVGElement {
   return el("path", outlined({ d: "M 12 5 L 18 11 L 12 19 L 6 11 Z", fill: GEM_COLOR }));
+}
+
+function drawKeyIcon(): SVGElement {
+  const stroke = { stroke: KEY_COLOR, "stroke-linecap": "round", fill: "none" };
+  return group(
+    el("circle", { ...stroke, cx: 8, cy: 8, r: 4, "stroke-width": 2.2 }),
+    el("line", { ...stroke, x1: 10.8, y1: 10.8, x2: 18, y2: 18, "stroke-width": 2.2 }),
+    el("line", { ...stroke, x1: 15.5, y1: 15.5, x2: 18, y2: 13, "stroke-width": 1.6 }),
+    el("line", { ...stroke, x1: 18, y1: 18, x2: 20.5, y2: 15.5, "stroke-width": 1.6 })
+  );
 }
