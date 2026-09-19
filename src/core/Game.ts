@@ -34,6 +34,7 @@ import { MONSTER_DEFINITIONS } from "@data/loaders/MonsterDefinitionLoader";
 import type { ItemDefinition } from "@data/resources/ItemDefinition";
 import { ITEM_DEFINITIONS } from "@data/loaders/ItemDefinitionLoader";
 import { equipItemFromInventory, unequipToInventory } from "@entities/EquipmentActions";
+import { FLEE_HP_RATIO } from "@battle/CombatFormulas";
 import { preloadMonsterTextures } from "@rendering/pawn/MonsterTextureLoader";
 import { randomAppearance } from "@data/generation/AppearanceGenerator";
 import { MovementSystem } from "@systems/MovementSystem";
@@ -55,7 +56,6 @@ import { GameLoop } from "./GameLoop";
 const GRID_WIDTH = 100;
 const GRID_HEIGHT = 80;
 const BANTARI_ID = "pawn.bantari";
-const FLEE_HP_RATIO = 0.3;
 
 const WASD_DIRECTIONS: Record<string, GridPos> = {
   KeyW: { x: 0, y: -1 },
