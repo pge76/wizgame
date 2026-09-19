@@ -106,6 +106,7 @@ export class Game {
   private playerEntityId!: EntityId;
   private loop!: GameLoop;
   private activeEncounterZoneId: string | null = null;
+  private previousPlayerPos?: GridPos;
 
   private readonly battleState = new BattleState();
   private battleSystem!: BattleSystem;
@@ -915,11 +916,18 @@ export class Game {
     }
   }
 
-  /** Picks up any ground item sitting on the player's own tile straight into the shared inventory
-   *  (first free slot; silently dropped if the inventory is full). */
+  /** Picks up a ground item once the player actually steps onto its tile (arrival, not merely
+   *  standing there) — straight into the shared inventory (first free slot; silently dropped if the
+   *  inventory is full). Gated on arrival rather than "currently on" so loot dropped right under the
+   *  party's feet on battle return (battleAnchorWorldPos == their own tile) stays visibly on the
+   *  ground instead of being swept up before it's ever rendered. */
   private checkGroundItemPickups(): void {
     const playerPos = this.entityManager.getComponent(this.playerEntityId, TransformComponent)?.position;
     if (!playerPos) return;
+
+    const justArrived = !this.previousPlayerPos || this.previousPlayerPos.x !== playerPos.x || this.previousPlayerPos.y !== playerPos.y;
+    this.previousPlayerPos = { x: playerPos.x, y: playerPos.y };
+    if (!justArrived) return;
 
     for (const id of this.entityManager.query(GroundItemComponent, TransformComponent)) {
       const pos = this.entityManager.getComponent(id, TransformComponent)!.position;
@@ -1072,6 +1080,12 @@ export class Game {
         this.grid.getCell(worldPos).occupantEntityId = id;
       }
       this.entityManager.removeComponent(id, BattleParticipantComponent);
+      // AttackAnimationSystem/MovementSystem only run while battleSystems is active — any lunge or
+      // step still mid-flight when the battle ends would otherwise stay frozen on this entity forever
+      // (AttackAnimationComponent's stale lunge offset in particular renders as a permanent visual
+      // drift in the overworld once nothing advances its progress anymore).
+      this.entityManager.removeComponent(id, AttackAnimationComponent);
+      this.entityManager.removeComponent(id, MovementComponent);
     }
 
     this.renderer.sceneRoot.removeChild(this.battleGridView.container);
