@@ -14,6 +14,14 @@ export enum WeaponSlotKind {
   Ranged
 }
 
+/** Silhouette family used to pick the item's icon (ItemIconSvg.ts) — purely visual, no gameplay effect. */
+export enum WeaponClass {
+  Dagger,
+  Sword,
+  Blunt,
+  Ranged
+}
+
 interface BaseItemDefinition extends ResourceDefinition {
   readonly kind: ItemKind;
   readonly stackable: boolean;
@@ -24,6 +32,7 @@ interface BaseItemDefinition extends ResourceDefinition {
 export interface WeaponDefinition extends BaseItemDefinition {
   readonly kind: ItemKind.Weapon;
   readonly slotKind: WeaponSlotKind;
+  readonly weaponClass: WeaponClass;
   readonly twoHanded: boolean;
   readonly damageMin: number;
   readonly damageMax: number;

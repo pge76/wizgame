@@ -3,7 +3,7 @@ import { EntityManager } from "@entities/EntityManager";
 import { EquipmentComponent, EquipmentSlot } from "@entities/components/EquipmentComponent";
 import { Party } from "@entities/Party";
 import { equipItemFromInventory, isHandSlotBlocked, unequipToInventory } from "@entities/EquipmentActions";
-import { ItemKind, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
+import { ItemKind, WeaponClass, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
 import { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 
 function weapon(id: string, twoHanded: boolean): ItemDefinition {
@@ -13,6 +13,7 @@ function weapon(id: string, twoHanded: boolean): ItemDefinition {
     stackable: false,
     kind: ItemKind.Weapon,
     slotKind: WeaponSlotKind.Hand,
+    weaponClass: WeaponClass.Sword,
     twoHanded,
     damageMin: 1,
     damageMax: 4,

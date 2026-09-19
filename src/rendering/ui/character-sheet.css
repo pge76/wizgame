@@ -83,27 +83,49 @@
   width: 96px;
   height: 72px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   text-align: center;
-  font-size: 15px;
+  font-size: 11px;
+  line-height: 1.2;
   color: #f0d9a0;
   background: rgba(17, 17, 22, 0.85);
   border: 1px solid #4a4a55;
   border-radius: 4px;
   padding: 3px;
+  cursor: pointer;
+}
+
+.character-sheet__slot-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.character-sheet__slot-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.character-sheet__slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .character-sheet__slot--empty {
   color: #6a6a75;
 }
 
-.character-sheet__slot--interactive {
-  cursor: pointer;
-}
-
 .character-sheet__slot--interactive:hover {
   border-color: #cba135;
+}
+
+.character-sheet__slot--selected {
+  border-color: #cba135;
+  box-shadow: 0 0 6px rgba(203, 161, 53, 0.6);
 }
 
 .character-sheet__stats-column {
@@ -133,6 +155,56 @@
   border: none;
   border-top: 1px solid #4a4a55;
   margin: 9px 0;
+}
+
+.character-sheet__info-box {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 12px 16px;
+  min-height: 24px;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #4a4a55;
+  border-radius: 4px;
+}
+
+.character-sheet__info-box-name {
+  color: #f0d9a0;
+  font-weight: bold;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.character-sheet__info-box-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  flex: 1;
+}
+
+.character-sheet__info-box-stats .character-sheet__stat-row {
+  font-size: 15px;
+  gap: 6px;
+}
+
+.character-sheet__info-box-action {
+  padding: 8px 14px;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #cba135;
+  border-radius: 6px;
+  color: #f0d9a0;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.character-sheet__info-box-action:hover {
+  background: rgba(203, 161, 53, 0.15);
+}
+
+.character-sheet__info-box-action[hidden] {
+  display: none;
 }
 
 .character-sheet__inventory {

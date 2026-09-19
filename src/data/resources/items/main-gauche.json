@@ -4,6 +4,7 @@
   "kind": "weapon",
   "stackable": false,
   "slotKind": "hand",
+  "weaponClass": "dagger",
   "twoHanded": false,
   "damageMin": 1,
   "damageMax": 5,

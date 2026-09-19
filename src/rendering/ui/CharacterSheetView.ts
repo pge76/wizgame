@@ -9,22 +9,13 @@ import { EquipmentComponent, EquipmentSlot } from "@entities/components/Equipmen
 import type { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import type { PawnDefinition } from "@data/resources/PawnDefinition";
 import { ItemKind, type ItemDefinition } from "@data/resources/ItemDefinition";
-import { getEffectiveDefense, getEquippedWeapon } from "@battle/CombatFormulas";
+import { getEffectiveDefense, getEquippedWeapon, UNARMED_WEAPON } from "@battle/CombatFormulas";
 import { buildFullPortraitSvg } from "./PortraitSvg";
+import { buildItemIconSvg } from "./ItemIconSvg";
 
-/** "Dagger (1-4)", "Rapier (1-7+1)", "Leather Armor (+2)" — compact stat suffix per item kind. */
-function formatItemLabel(item: ItemDefinition): string {
-  switch (item.kind) {
-    case ItemKind.Weapon: {
-      const bonus = item.attackBonus > 0 ? `+${item.attackBonus}` : "";
-      return `${item.displayName} (${item.damageMin}-${item.damageMax}${bonus})`;
-    }
-    case ItemKind.Armor:
-      return `${item.displayName} (+${item.defenseBonus})`;
-    case ItemKind.Misc:
-      return item.displayName;
-  }
-}
+/** References either a paperdoll equipment slot or a party inventory slot — whichever is currently
+ *  selected for the info box. */
+type SelectedSlotRef = { readonly kind: "equip"; readonly slot: EquipmentSlot } | { readonly kind: "inventory"; readonly index: number };
 
 const LEFT_SLOTS = [EquipmentSlot.Head, EquipmentSlot.Neck, EquipmentSlot.Cloak, EquipmentSlot.Torso, EquipmentSlot.Legs];
 const RIGHT_SLOTS = [EquipmentSlot.Ring, EquipmentSlot.Gloves, EquipmentSlot.Boots, EquipmentSlot.Ranged, EquipmentSlot.Munition];
@@ -45,20 +36,29 @@ const SLOT_LABELS: Record<EquipmentSlot, string> = {
   [EquipmentSlot.Neck]: "Neck"
 };
 
-/** Centered overlay showing one party member's portrait, equipment paperdoll, and stats.
+/** Centered overlay showing one party member's portrait, equipment paperdoll, stats, and shared
+ *  inventory.
  *
  *  Equipment and inventory slot elements are built once and updated in place on `sync()`, rather
  *  than being torn down and rebuilt every frame (`sync()` runs on every render tick while visible):
  *  rebuilding would detach their click listeners mid-gesture on a slow tap/click, the same class of
- *  bug the persistent close button already works around. */
+ *  bug the persistent close button already works around.
+ *
+ *  Clicking a slot only *selects* it and fills the info box with its details — it does not equip or
+ *  unequip anything by itself. That happens only via the info box's own action button, so browsing
+ *  items can't accidentally change what's worn. */
 export class CharacterSheetView {
   readonly element: HTMLDivElement;
   private entityId: EntityId | null = null;
+  private selectedSlotRef: SelectedSlotRef | null = null;
   private readonly panel: HTMLDivElement;
   private readonly portraitWrap: HTMLDivElement;
   private readonly statsColumn: HTMLDivElement;
   private readonly equipSlotElements = new Map<EquipmentSlot, HTMLDivElement>();
   private readonly inventorySlotElements: HTMLDivElement[];
+  private readonly infoBoxName: HTMLDivElement;
+  private readonly infoBoxStats: HTMLDivElement;
+  private readonly infoBoxAction: HTMLButtonElement;
 
   constructor(
     private readonly manager: EntityManager,
@@ -103,6 +103,18 @@ export class CharacterSheetView {
     this.statsColumn.className = "character-sheet__stats-column";
     body.appendChild(this.statsColumn);
 
+    const infoBox = document.createElement("div");
+    infoBox.className = "character-sheet__info-box";
+    this.infoBoxName = document.createElement("div");
+    this.infoBoxName.className = "character-sheet__info-box-name";
+    this.infoBoxStats = document.createElement("div");
+    this.infoBoxStats.className = "character-sheet__info-box-stats";
+    this.infoBoxAction = document.createElement("button");
+    this.infoBoxAction.className = "character-sheet__info-box-action";
+    this.infoBoxAction.addEventListener("click", () => this.runSelectedSlotAction());
+    infoBox.append(this.infoBoxName, this.infoBoxStats, this.infoBoxAction);
+    scroll.appendChild(infoBox);
+
     const inventory = document.createElement("div");
     inventory.className = "character-sheet__inventory";
     this.inventorySlotElements = this.party
@@ -120,12 +132,14 @@ export class CharacterSheetView {
 
   show(id: EntityId): void {
     this.entityId = id;
+    this.selectedSlotRef = null;
     this.element.hidden = false;
     this.sync();
   }
 
   hide(): void {
     this.entityId = null;
+    this.selectedSlotRef = null;
     this.element.hidden = true;
   }
 
@@ -154,21 +168,93 @@ export class CharacterSheetView {
     this.syncStatsColumn(id, stats, experience, attributes);
 
     for (const [slot, slotEl] of this.equipSlotElements) {
-      this.syncSlotElement(slotEl, equipment?.slots[slot] ?? null, SLOT_LABELS[slot]);
+      this.syncSlotElement(slotEl, equipment?.slots[slot] ?? null, SLOT_LABELS[slot], this.isSelected({ kind: "equip", slot }));
     }
 
     const inventoryItemIds = this.party.getInventory();
     this.inventorySlotElements.forEach((slotEl, index) => {
-      this.syncSlotElement(slotEl, inventoryItemIds[index] ?? null, "");
+      this.syncSlotElement(slotEl, inventoryItemIds[index] ?? null, "", this.isSelected({ kind: "inventory", index }));
     });
+
+    this.syncInfoBox(equipment);
+  }
+
+  private isSelected(ref: SelectedSlotRef): boolean {
+    if (!this.selectedSlotRef) return false;
+    return this.selectedSlotRef.kind === "equip" && ref.kind === "equip"
+      ? this.selectedSlotRef.slot === ref.slot
+      : this.selectedSlotRef.kind === "inventory" && ref.kind === "inventory"
+        ? this.selectedSlotRef.index === ref.index
+        : false;
   }
 
   /** Applies the current item (or empty placeholder) to an already-built slot element. */
-  private syncSlotElement(slotEl: HTMLDivElement, itemId: string | null, emptyLabel: string): void {
+  private syncSlotElement(slotEl: HTMLDivElement, itemId: string | null, emptyLabel: string, selected: boolean): void {
     const item = itemId && this.itemRegistry.has(itemId) ? this.itemRegistry.get(itemId) : null;
-    slotEl.textContent = item ? formatItemLabel(item) : emptyLabel;
+    const iconWrap = slotEl.querySelector(".character-sheet__slot-icon")!;
+    const nameEl = slotEl.querySelector(".character-sheet__slot-name")!;
+
+    iconWrap.replaceChildren(...(item ? [buildItemIconSvg(item)] : []));
+    nameEl.textContent = item ? item.displayName : emptyLabel;
+
     slotEl.classList.toggle("character-sheet__slot--empty", !item);
     slotEl.classList.toggle("character-sheet__slot--interactive", item !== null && item.kind !== ItemKind.Misc);
+    slotEl.classList.toggle("character-sheet__slot--selected", selected);
+  }
+
+  /** Fills the info box from the currently selected slot, or shows a neutral placeholder. */
+  private syncInfoBox(equipment: EquipmentComponent | undefined): void {
+    const itemId = this.resolveSelectedItemId(equipment);
+    const item = itemId && this.itemRegistry.has(itemId) ? this.itemRegistry.get(itemId) : null;
+
+    if (!this.selectedSlotRef || !item) {
+      this.infoBoxName.textContent = "Kein Gegenstand ausgewählt";
+      this.infoBoxStats.replaceChildren();
+      this.infoBoxAction.hidden = true;
+      return;
+    }
+
+    this.infoBoxName.textContent = item.displayName;
+    this.infoBoxStats.replaceChildren(...this.buildItemStatLines(item));
+
+    this.infoBoxAction.hidden = item.kind === ItemKind.Misc;
+    this.infoBoxAction.textContent = this.selectedSlotRef.kind === "inventory" ? "Ausrüsten" : "Ablegen";
+  }
+
+  private resolveSelectedItemId(equipment: EquipmentComponent | undefined): string | null {
+    if (!this.selectedSlotRef) return null;
+    return this.selectedSlotRef.kind === "equip"
+      ? (equipment?.slots[this.selectedSlotRef.slot] ?? null)
+      : (this.party.getInventory()[this.selectedSlotRef.index] ?? null);
+  }
+
+  private buildItemStatLines(item: ItemDefinition): HTMLDivElement[] {
+    switch (item.kind) {
+      case ItemKind.Weapon: {
+        const lines = [
+          this.buildStatRow("Angriffswerte", `${item.damageMin}-${item.damageMax}${item.attackBonus > 0 ? ` (+${item.attackBonus})` : ""}`)
+        ];
+        if (item.twoHanded) lines.push(this.buildStatRow("Beidhändig", "Ja"));
+        return lines;
+      }
+      case ItemKind.Armor:
+        return [this.buildStatRow("Verteidigungswerte", `+${item.defenseBonus}`)];
+      case ItemKind.Misc:
+        return [];
+    }
+  }
+
+  /** Performs the info box's action (equip from inventory, or unequip) on the current selection,
+   *  then clears the selection — the equipped/inventory state itself is re-read on the next sync(). */
+  private runSelectedSlotAction(): void {
+    if (this.entityId === null || !this.selectedSlotRef) return;
+
+    if (this.selectedSlotRef.kind === "inventory") {
+      this.onEquipFromInventory(this.entityId, this.selectedSlotRef.index);
+    } else {
+      this.onUnequip(this.entityId, this.selectedSlotRef.slot);
+    }
+    this.selectedSlotRef = null;
   }
 
   private buildCloseButton(): HTMLButtonElement {
@@ -186,27 +272,40 @@ export class CharacterSheetView {
     return list;
   }
 
-  /** Built once per paperdoll slot; content is filled in later by sync()/syncSlotElement(). */
+  /** Built once per paperdoll slot; content is filled in later by sync()/syncSlotElement(). Clicking
+   *  it only selects it (see class doc) — it no longer unequips directly. */
   private createEquipSlotElement(slot: EquipmentSlot): HTMLDivElement {
-    const slotEl = document.createElement("div");
-    slotEl.className = "character-sheet__slot character-sheet__slot--empty";
-    slotEl.textContent = SLOT_LABELS[slot];
+    const slotEl = this.buildBareSlotElement(SLOT_LABELS[slot]);
     slotEl.addEventListener("click", () => {
-      if (this.entityId !== null) this.onUnequip(this.entityId, slot);
+      this.selectedSlotRef = { kind: "equip", slot };
+      this.sync();
     });
     this.equipSlotElements.set(slot, slotEl);
     return slotEl;
   }
 
   /** Built once per party inventory slot; content is filled in later by sync()/syncSlotElement().
-   *  Tapping an equippable item equips it onto the open character straight away (destination slot
-   *  picked automatically). */
+   *  Clicking it only selects it (see class doc) — it no longer equips directly. */
   private createInventorySlotElement(inventorySlot: number): HTMLDivElement {
+    const slotEl = this.buildBareSlotElement("");
+    slotEl.addEventListener("click", () => {
+      this.selectedSlotRef = { kind: "inventory", index: inventorySlot };
+      this.sync();
+    });
+    return slotEl;
+  }
+
+  private buildBareSlotElement(emptyLabel: string): HTMLDivElement {
     const slotEl = document.createElement("div");
     slotEl.className = "character-sheet__slot character-sheet__slot--empty";
-    slotEl.addEventListener("click", () => {
-      if (this.entityId !== null) this.onEquipFromInventory(this.entityId, inventorySlot);
-    });
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "character-sheet__slot-icon";
+    const nameEl = document.createElement("div");
+    nameEl.className = "character-sheet__slot-name";
+    nameEl.textContent = emptyLabel;
+    slotEl.append(iconWrap, nameEl);
+
     return slotEl;
   }
 
@@ -216,14 +315,14 @@ export class CharacterSheetView {
     experience: ExperienceComponent | undefined,
     attributes: PawnDefinition["attributes"]
   ): void {
-    const effectiveDefense = getEffectiveDefense(this.manager, this.itemRegistry, entityId);
-    const armorBonus = effectiveDefense - stats.defense;
-    const armorClassLabel = armorBonus > 0 ? `${effectiveDefense} (+${armorBonus})` : `${effectiveDefense}`;
+    // Armor Class is purely gear-driven now (BASE_ARMOR_CLASS is 0), so this total *is* the armor
+    // contribution — no "base + bonus" breakdown to show.
+    const armorClassLabel = `${getEffectiveDefense(this.manager, this.itemRegistry, entityId)}`;
 
     const weapon = getEquippedWeapon(this.manager, this.itemRegistry, entityId);
-    const damageLabel = weapon
-      ? `${weapon.damageMin}-${weapon.damageMax}${weapon.attackBonus > 0 ? `+${weapon.attackBonus}` : ""}`
-      : "Unarmed";
+    const damageStats = weapon ?? UNARMED_WEAPON;
+    const damageBonus = damageStats.attackBonus > 0 ? `+${damageStats.attackBonus}` : "";
+    const damageLabel = `${weapon ? "" : "Unarmed "}${damageStats.damageMin}-${damageStats.damageMax}${damageBonus}`;
 
     const rows: [string, string][] = [
       ["Hit Points", `${stats.currentHP} / ${stats.maxHP}`],
