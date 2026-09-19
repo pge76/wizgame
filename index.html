@@ -2,11 +2,12 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>WizGame</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <style>
-      html, body { margin: 0; padding: 0; background: #111; height: 100%; overflow: hidden; }
+      /* Pinch/pan on the canvas is handled by CameraController; the page itself must not also zoom/scroll. */
+      html, body { margin: 0; padding: 0; background: #111; height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: none; }
       #app { position: relative; width: 100vw; height: 100vh; display: block; }
     </style>
   </head>

@@ -47,7 +47,10 @@
   color: #555;
 }
 
-.battle-action-bar__auto-toggle {
+.battle-action-bar__auto-toggle,
+.battle-action-bar__next-unit,
+.battle-action-bar__end-turn {
+  min-height: 44px; /* comfortable touch target */
   padding: 8px 14px;
   background: rgba(17, 17, 22, 0.85);
   border: 1px solid #4a4a55;
@@ -66,16 +69,6 @@
   border-color: #cba135;
   color: #f0d9a0;
   box-shadow: 0 0 6px rgba(203, 161, 53, 0.6);
-}
-
-.battle-action-bar__end-turn {
-  padding: 8px 14px;
-  background: rgba(17, 17, 22, 0.85);
-  border: 1px solid #4a4a55;
-  border-radius: 6px;
-  color: #ddd;
-  cursor: pointer;
-  font: inherit;
 }
 
 .battle-action-bar__end-turn:hover {
