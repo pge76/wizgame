@@ -16,13 +16,15 @@ export class BattleActionBarView {
   private readonly attackEl: HTMLDivElement;
   private readonly aiBehaviorEl: HTMLSelectElement;
   private readonly autoToggleEl: HTMLButtonElement;
+  private readonly nextUnitEl: HTMLButtonElement;
   private readonly endTurnEl: HTMLButtonElement;
 
   constructor(
     private readonly manager: EntityManager,
     onEndTurn: () => void,
     onAiBehaviorChange: (behavior: PlayerAiBehavior) => void,
-    onAutoToggle: () => void
+    onAutoToggle: () => void,
+    onNextUnit: () => void
   ) {
     this.element = document.createElement("div");
     this.element.className = "battle-action-bar";
@@ -53,12 +55,25 @@ export class BattleActionBarView {
     this.autoToggleEl.textContent = "Auto";
     this.autoToggleEl.addEventListener("click", onAutoToggle);
 
+    // Touch has no Tab key to cycle the selection, so this button covers that (and works on desktop too).
+    this.nextUnitEl = document.createElement("button");
+    this.nextUnitEl.className = "battle-action-bar__next-unit";
+    this.nextUnitEl.textContent = "Nächste Einheit";
+    this.nextUnitEl.addEventListener("click", onNextUnit);
+
     this.endTurnEl = document.createElement("button");
     this.endTurnEl.className = "battle-action-bar__end-turn";
     this.endTurnEl.textContent = "Zug beenden";
     this.endTurnEl.addEventListener("click", onEndTurn);
 
-    this.element.append(this.moveEl, this.attackEl, this.aiBehaviorEl, this.autoToggleEl, this.endTurnEl);
+    this.element.append(
+      this.moveEl,
+      this.attackEl,
+      this.aiBehaviorEl,
+      this.autoToggleEl,
+      this.nextUnitEl,
+      this.endTurnEl
+    );
   }
 
   sync(selectedEntityId: EntityId | null): void {

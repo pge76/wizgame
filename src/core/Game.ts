@@ -14,7 +14,7 @@ import { BattleParticipantComponent } from "@entities/components/BattleParticipa
 import { PlayerAiBehaviorComponent } from "@entities/components/PlayerAiBehaviorComponent";
 import { PlayerAiBehavior } from "@data/resources/PlayerAiBehavior";
 import { Grid } from "@world/Grid";
-import { TILE_SIZE, gridToWorld, lerpGridPos, type GridPos } from "@world/Coordinates";
+import { TILE_SIZE, gridToWorld, lerpGridPos, worldToGrid, type GridPos } from "@world/Coordinates";
 import { findPath } from "@world/Pathfinding";
 import { buildBattleGrid, ENCOUNTER_RADIUS } from "@battle/BattleGridBuilder";
 import { findFreeWalkablePositionsNear, spawnCombatant } from "@battle/CombatantSpawner";
@@ -169,7 +169,8 @@ export class Game {
       this.entityManager,
       () => this.endPlayerPhase(),
       (behavior) => this.setSelectedUnitAiBehavior(behavior),
-      () => this.toggleSelectedUnitAuto()
+      () => this.toggleSelectedUnitAuto(),
+      () => this.cycleSelection()
     );
     mountEl.appendChild(this.battleActionBarView.element);
 
@@ -186,6 +187,7 @@ export class Game {
     this.playerInput = new PlayerInputController(this.renderer.app, this.camera, (target) =>
       this.commandPlayerMove(target)
     );
+    this.camera.setTapHandler((screenX, screenY) => this.handleCanvasTap(screenX, screenY));
 
     window.addEventListener("keydown", (event) => {
       if (event.code !== "Tab" || this.mode !== GameMode.Battle || this.battleState.phase !== BattlePhase.Player) return;
@@ -278,6 +280,36 @@ export class Game {
     if (!path || path.length === 0) return;
 
     this.entityManager.addComponent(this.playerEntityId, MovementComponent, new MovementComponent(path));
+    this.camera.manualOverride = false; // a fresh move command resumes the camera following the leader
+  }
+
+  /**
+   * Touch-tap equivalent of the desktop mouse controls, routed by what's under the tap since touch
+   * has no left/right button distinction: in the overworld a tap always moves/attacks (≙ right-click);
+   * in battle, tapping one's own unit selects it (≙ left-click), tapping anything else moves/attacks
+   * (≙ right-click).
+   */
+  private handleCanvasTap(screenX: number, screenY: number): void {
+    const worldPos = this.camera.screenToWorld(screenX, screenY);
+    const gridPos = worldToGrid(worldPos.x, worldPos.y);
+
+    if (this.mode === GameMode.Overworld) {
+      this.commandPlayerMove(gridPos);
+      return;
+    }
+
+    if (this.mode === GameMode.Battle && this.battleGrid) {
+      if (!this.battleGrid.isInBounds(gridPos)) return;
+
+      const occupantId = this.battleGrid.getCell(gridPos).occupantEntityId;
+      const isOwnUnit = occupantId !== null && this.entityManager.getComponent(occupantId, FactionComponent)?.faction === Faction.PC;
+
+      if (isOwnUnit) {
+        this.selectUnit(gridPos);
+      } else {
+        this.handleBattleRightClick(gridPos);
+      }
+    }
   }
 
   /** True if `target` is the world monster's tile and it can actually be walked to (ignoring the monster's own occupancy). */
@@ -319,6 +351,8 @@ export class Game {
   }
 
   private followPlayerCamera(): void {
+    if (this.camera.manualOverride) return; // player is free-looking (touch pan/pinch); don't fight it
+
     const transform = this.entityManager.getComponent(this.playerEntityId, TransformComponent);
     if (!transform) return;
 
@@ -899,6 +933,7 @@ export class Game {
     this.gridView.container.visible = true;
 
     this.camera.setWorldBounds(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE);
+    this.camera.manualOverride = false; // resume following the leader back in the overworld
     if (this.battleAnchorWorldPos) {
       const worldCenter = gridToWorld(this.battleAnchorWorldPos);
       this.camera.centerOn(worldCenter.x, worldCenter.y);

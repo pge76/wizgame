@@ -44,7 +44,7 @@ export class PartyBarView {
   constructor(
     private readonly manager: EntityManager,
     private readonly party: Party,
-    private readonly onSlotRightClick?: (slot: number) => void
+    private readonly onOpenCharacterSheet?: (slot: number) => void
   ) {
     this.element = document.createElement("div");
     this.element.className = "party-bar";
@@ -71,10 +71,12 @@ export class PartyBarView {
       slotEl.addEventListener("mouseleave", () => {
         this.debugTooltip.hidden = true;
       });
+      // Right-click on desktop, plain click/tap everywhere else (including touch) — both open the sheet.
       const capturedSlot = slot;
+      slotEl.addEventListener("click", () => this.onOpenCharacterSheet?.(capturedSlot));
       slotEl.addEventListener("contextmenu", (event) => {
         event.preventDefault();
-        this.onSlotRightClick?.(capturedSlot);
+        this.onOpenCharacterSheet?.(capturedSlot);
       });
       this.slots[slot] = slotEl;
       sideEl.appendChild(slotEl);
