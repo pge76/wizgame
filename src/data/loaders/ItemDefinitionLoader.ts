@@ -1,4 +1,4 @@
-import { ItemKind, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
+import { ItemKind, WeaponClass, WeaponSlotKind, type ItemDefinition } from "@data/resources/ItemDefinition";
 import { EquipmentSlot } from "@entities/components/EquipmentComponent";
 
 interface BaseItemJson {
@@ -10,6 +10,7 @@ interface BaseItemJson {
 interface WeaponJson extends BaseItemJson {
   readonly kind: "weapon";
   readonly slotKind: "hand" | "ranged";
+  readonly weaponClass: "dagger" | "sword" | "blunt" | "ranged";
   readonly twoHanded: boolean;
   readonly damageMin: number;
   readonly damageMax: number;
@@ -35,6 +36,13 @@ const WEAPON_SLOT_KIND_BY_NAME: Record<WeaponJson["slotKind"], WeaponSlotKind> =
   ranged: WeaponSlotKind.Ranged
 };
 
+const WEAPON_CLASS_BY_NAME: Record<WeaponJson["weaponClass"], WeaponClass> = {
+  dagger: WeaponClass.Dagger,
+  sword: WeaponClass.Sword,
+  blunt: WeaponClass.Blunt,
+  ranged: WeaponClass.Ranged
+};
+
 const ARMOR_EQUIP_SLOT_BY_NAME: Record<ArmorEquipSlotName, EquipmentSlot> = {
   head: EquipmentSlot.Head,
   torso: EquipmentSlot.Torso,
@@ -53,12 +61,17 @@ function toItemDefinition(json: ItemJson): ItemDefinition {
       if (slotKind === undefined) {
         throw new Error(`Unknown weapon slotKind "${json.slotKind}" in item definition "${json.id}".`);
       }
+      const weaponClass = WEAPON_CLASS_BY_NAME[json.weaponClass];
+      if (weaponClass === undefined) {
+        throw new Error(`Unknown weaponClass "${json.weaponClass}" in item definition "${json.id}".`);
+      }
       return {
         id: json.id,
         displayName: json.displayName,
         stackable: json.stackable,
         kind: ItemKind.Weapon,
         slotKind,
+        weaponClass,
         twoHanded: json.twoHanded,
         damageMin: json.damageMin,
         damageMax: json.damageMax,

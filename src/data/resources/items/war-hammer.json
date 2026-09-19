@@ -4,6 +4,7 @@
   "kind": "weapon",
   "stackable": false,
   "slotKind": "hand",
+  "weaponClass": "blunt",
   "twoHanded": false,
   "damageMin": 3,
   "damageMax": 7,
