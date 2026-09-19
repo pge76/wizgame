@@ -1,9 +1,10 @@
 name: Deploy to GitHub Pages
 
-# Deploys the latest pushed commit on any branch, so whichever branch is
-# currently being developed is what shows up at the Pages URL.
+# Deploys on every push to master, so the Pages URL always reflects the
+# latest merged state.
 on:
   push:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
