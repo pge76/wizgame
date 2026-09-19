@@ -1,7 +1,10 @@
 import { defineConfig } from "vite";
 import path from "node:path";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // GitHub Pages serves this repo under /wizgame/, so production builds need that as the base;
+  // dev server stays at root.
+  base: command === "build" ? "/wizgame/" : "/",
   build: {
     // Always emit sprite assets as separate files so pixi's Texture cache and the raster
     // sprite pipeline behave the same regardless of a given image's file size.
@@ -23,4 +26,4 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"]
   }
-});
+}));
