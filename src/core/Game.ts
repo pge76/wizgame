@@ -330,22 +330,36 @@ export class Game {
     this.characterSheetView.show(id);
   }
 
+  /**
+   * A door/monster tile is an interaction target: bumping it (attacking, or trying its lock) only
+   * fires once the player is actually standing next to it — not merely because it was clicked from
+   * anywhere reachable. Clicking one from a distance instead walks the player up to the nearest free
+   * neighboring tile; the interaction itself needs a follow-up click/step once adjacent.
+   */
   private commandPlayerMove(target: GridPos): void {
     const transform = this.entityManager.getComponent(this.playerEntityId, TransformComponent);
     if (!transform) return;
 
-    if (this.isWorldMonsterReachableAt(target, transform.position)) {
-      this.triggerWorldMonsterBattle();
-      return;
-    }
-
+    const isMonsterTarget = this.isWorldMonsterAt(target);
     const closedDoor = this.getClosedDoorAt(target);
-    if (closedDoor) {
-      // Bumping a closed door only ever opens it (if possible) — it never also walks you through,
-      // matching every other door regardless of locked/unlocked. Walk into it again afterward.
-      if (tryOpenDoor(closedDoor.door, this.party.getInventory())) {
-        this.grid.getCell(target).occupantEntityId = null;
+
+    if (isMonsterTarget || closedDoor) {
+      if (this.isAdjacent(transform.position, target)) {
+        if (isMonsterTarget) {
+          this.triggerWorldMonsterBattle();
+        } else if (closedDoor && tryOpenDoor(closedDoor.door, this.party.getInventory())) {
+          // Bumping a closed door only ever opens it (if possible) — it never also walks you through,
+          // matching every other door regardless of locked/unlocked. Walk into it again afterward.
+          this.grid.getCell(target).occupantEntityId = null;
+        }
+        return;
       }
+
+      const approachPath = this.findPathAdjacentTo(target, transform.position);
+      if (!approachPath || approachPath.length === 0) return;
+
+      this.entityManager.addComponent(this.playerEntityId, MovementComponent, new MovementComponent(approachPath));
+      this.camera.manualOverride = false;
       return;
     }
 
@@ -354,6 +368,26 @@ export class Game {
 
     this.entityManager.addComponent(this.playerEntityId, MovementComponent, new MovementComponent(path));
     this.camera.manualOverride = false; // a fresh move command resumes the camera following the leader
+  }
+
+  /** True if `b` is one orthogonal step away from `a`. */
+  private isAdjacent(a: GridPos, b: GridPos): boolean {
+    return this.grid.neighbors(a, false).some((n) => n.x === b.x && n.y === b.y);
+  }
+
+  /** Shortest path from `from` to whichever free, walkable tile neighboring `target` is closest —
+   *  `target` itself is excluded since it's occupied by the door/monster we're approaching. */
+  private findPathAdjacentTo(target: GridPos, from: GridPos): GridPos[] | null {
+    const candidates = this.grid
+      .neighbors(target, false)
+      .filter((n) => this.tileRegistry.get(this.grid.getCell(n).terrainId).walkable && this.grid.getCell(n).occupantEntityId === null);
+
+    let best: GridPos[] | null = null;
+    for (const candidate of candidates) {
+      const path = findPath(this.grid, this.tileRegistry, from, candidate);
+      if (path && (best === null || path.length < best.length)) best = path;
+    }
+    return best;
   }
 
   /**
@@ -385,20 +419,12 @@ export class Game {
     }
   }
 
-  /** True if `target` is the world monster's tile and it can actually be walked to (ignoring the monster's own occupancy). */
-  private isWorldMonsterReachableAt(target: GridPos, from: GridPos): boolean {
+  /** True if `pos` is the world monster's current tile. */
+  private isWorldMonsterAt(pos: GridPos): boolean {
     if (this.worldMonsterEntityId === undefined) return false;
 
     const monsterPos = this.entityManager.getComponent(this.worldMonsterEntityId, TransformComponent)?.position;
-    if (!monsterPos || monsterPos.x !== target.x || monsterPos.y !== target.y) return false;
-
-    const cell = this.grid.getCell(monsterPos);
-    const previousOccupant = cell.occupantEntityId;
-    cell.occupantEntityId = null;
-    const path = findPath(this.grid, this.tileRegistry, from, target);
-    cell.occupantEntityId = previousOccupant;
-
-    return path !== null;
+    return !!monsterPos && monsterPos.x === pos.x && monsterPos.y === pos.y;
   }
 
   /** The closed door occupying `pos`, if any — open doors don't block, so they're not "at" here. */
