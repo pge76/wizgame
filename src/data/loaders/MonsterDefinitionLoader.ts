@@ -1,4 +1,4 @@
-import { AiBehavior, Faction, type CombatStats, type PawnDefinition } from "@data/resources/PawnDefinition";
+import { AiBehavior, Faction, type CombatStats, type LootEntry, type PawnDefinition } from "@data/resources/PawnDefinition";
 
 interface MonsterJson {
   readonly id: string;
@@ -7,6 +7,7 @@ interface MonsterJson {
   readonly stats: CombatStats;
   readonly aiBehavior?: "basic" | "skirmish";
   readonly spriteAsset?: string;
+  readonly lootTable?: readonly LootEntry[];
 }
 
 const FACTION_BY_NAME: Record<MonsterJson["faction"], Faction> = {
@@ -39,7 +40,8 @@ function toPawnDefinition(json: MonsterJson): PawnDefinition {
     faction,
     stats: json.stats,
     aiBehavior,
-    spriteAsset: json.spriteAsset
+    spriteAsset: json.spriteAsset,
+    lootTable: json.lootTable
   };
 }
 

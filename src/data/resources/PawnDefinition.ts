@@ -33,6 +33,12 @@ export interface Attributes {
   readonly senses: number;
 }
 
+/** One possible drop: `itemId` drops independently with probability `dropChance` (0-1) on death. */
+export interface LootEntry {
+  readonly itemId: string;
+  readonly dropChance: number;
+}
+
 export interface PawnDefinition extends ResourceDefinition {
   readonly faction: Faction;
   readonly stats: CombatStats;
@@ -42,6 +48,8 @@ export interface PawnDefinition extends ResourceDefinition {
   readonly aiBehavior?: AiBehavior;
   /** Filename of an imported raster sprite (see src/assets/monsters/) to render instead of the vector pawn. */
   readonly spriteAsset?: string;
+  /** Possible item drops on death — see LootGenerator.rollLoot. Monster/NPC only. */
+  readonly lootTable?: readonly LootEntry[];
 }
 
 export const PAWN_HUMANOID: PawnDefinition = {

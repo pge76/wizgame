@@ -13,6 +13,9 @@ import { FactionComponent } from "@entities/components/FactionComponent";
 import { BattleParticipantComponent } from "@entities/components/BattleParticipantComponent";
 import { PlayerAiBehaviorComponent } from "@entities/components/PlayerAiBehaviorComponent";
 import { PlayerAiBehavior } from "@data/resources/PlayerAiBehavior";
+import { DoorComponent } from "@entities/components/DoorComponent";
+import { GroundItemComponent } from "@entities/components/GroundItemComponent";
+import { tryOpenDoor } from "@entities/DoorActions";
 import { Grid } from "@world/Grid";
 import { TILE_SIZE, gridToWorld, lerpGridPos, worldToGrid, type GridPos } from "@world/Coordinates";
 import { findPath } from "@world/Pathfinding";
@@ -24,6 +27,8 @@ import { BattleSystem } from "@battle/BattleSystem";
 import { EnemyAISystem } from "@battle/EnemyAISystem";
 import { getEncounterTable } from "@data/resources/EncounterTable";
 import { rollEncounter } from "@data/generation/EncounterGenerator";
+import { generateDoorPlacements } from "@data/generation/DoorGenerator";
+import { rollLoot } from "@data/generation/LootGenerator";
 import { ResourceRegistry } from "@data/loaders/ResourceRegistry";
 import { TILE_FLOOR, TILE_GRASS, TILE_SAND, TILE_WALL, TILE_WATER, type TileDefinition } from "@data/resources/TileDefinition";
 import { applyTestCityMap, TEST_CITY_MAP } from "@data/maps/TestCityMap";
@@ -43,6 +48,8 @@ import type { System } from "@systems/System";
 import { Renderer } from "@rendering/Renderer";
 import { GridView } from "@rendering/GridView";
 import { PawnView } from "@rendering/PawnView";
+import { DoorView } from "@rendering/DoorView";
+import { GroundItemView } from "@rendering/GroundItemView";
 import { CameraController } from "@rendering/CameraController";
 import { PlayerInputController } from "@rendering/PlayerInputController";
 import { BattleInputController } from "@rendering/BattleInputController";
@@ -56,6 +63,7 @@ import { GameLoop } from "./GameLoop";
 const GRID_WIDTH = 100;
 const GRID_HEIGHT = 80;
 const BANTARI_ID = "pawn.bantari";
+const RUSTY_KEY_ID = "item.key.rusty-key";
 
 const WASD_DIRECTIONS: Record<string, GridPos> = {
   KeyW: { x: 0, y: -1 },
@@ -85,6 +93,8 @@ export class Game {
   private readonly party = new Party();
   private gridView!: GridView;
   private pawnView!: PawnView;
+  private doorView!: DoorView;
+  private groundItemView!: GroundItemView;
   private partyBarView!: PartyBarView;
   private characterSheetView!: CharacterSheetView;
   private battleHudView!: BattleHudView;
@@ -134,6 +144,7 @@ export class Game {
       y: Math.floor((GRID_HEIGHT - TEST_CITY_MAP.height) / 2)
     };
     applyTestCityMap(this.grid, cityOrigin);
+    this.placeDoors(cityOrigin);
 
     const movementSystem = new MovementSystem();
     this.overworldSystems.push(movementSystem);
@@ -160,9 +171,11 @@ export class Game {
     await this.renderer.init(mountEl);
     this.gridView = new GridView(this.grid, this.tileRegistry);
     this.gridView.build();
+    this.doorView = new DoorView(this.entityManager);
+    this.groundItemView = new GroundItemView(this.entityManager);
     this.pawnView = new PawnView(this.entityManager, this.pawnRegistry);
 
-    this.renderer.sceneRoot.addChild(this.gridView.container, this.pawnView.container);
+    this.renderer.sceneRoot.addChild(this.gridView.container, this.doorView.container, this.groundItemView.container, this.pawnView.container);
 
     this.partyBarView = new PartyBarView(this.entityManager, this.party, (slot) => this.openCharacterSheet(slot));
     mountEl.appendChild(this.partyBarView.element);
@@ -297,6 +310,19 @@ export class Game {
     this.worldMonsterEntityId = id;
   }
 
+  /** Places doors at ~50% of the city map's internal room doorway gaps (generateDoorPlacements),
+   *  ~10% of those locked behind the rusty key. Doors block their tile like pawns until opened. */
+  private placeDoors(cityOrigin: GridPos): void {
+    const worldGapPositions = TEST_CITY_MAP.doorPositions.map((pos) => ({ x: cityOrigin.x + pos.x, y: cityOrigin.y + pos.y }));
+
+    for (const { pos, locked } of generateDoorPlacements(worldGapPositions)) {
+      const id = this.entityManager.createEntity();
+      this.entityManager.addComponent(id, TransformComponent, new TransformComponent(pos));
+      this.entityManager.addComponent(id, DoorComponent, new DoorComponent(locked ? RUSTY_KEY_ID : null));
+      this.grid.getCell(pos).occupantEntityId = id;
+    }
+  }
+
   /** Opens the character sheet for the given party slot (0-based). No-op if that slot is empty. */
   private openCharacterSheet(slot: number): void {
     const id = this.party.getMember(slot);
@@ -310,6 +336,16 @@ export class Game {
 
     if (this.isWorldMonsterReachableAt(target, transform.position)) {
       this.triggerWorldMonsterBattle();
+      return;
+    }
+
+    const closedDoor = this.getClosedDoorAt(target);
+    if (closedDoor) {
+      // Bumping a closed door only ever opens it (if possible) — it never also walks you through,
+      // matching every other door regardless of locked/unlocked. Walk into it again afterward.
+      if (tryOpenDoor(closedDoor.door, this.party.getInventory())) {
+        this.grid.getCell(target).occupantEntityId = null;
+      }
       return;
     }
 
@@ -365,6 +401,17 @@ export class Game {
     return path !== null;
   }
 
+  /** The closed door occupying `pos`, if any — open doors don't block, so they're not "at" here. */
+  private getClosedDoorAt(pos: GridPos): { id: EntityId; door: DoorComponent } | null {
+    if (!this.grid.isInBounds(pos)) return null;
+
+    const occupantId = this.grid.getCell(pos).occupantEntityId;
+    if (occupantId === null) return null;
+
+    const door = this.entityManager.getComponent(occupantId, DoorComponent);
+    return door && !door.isOpen ? { id: occupantId, door } : null;
+  }
+
   private triggerWorldMonsterBattle(): void {
     if (this.worldMonsterEntityId === undefined) return;
 
@@ -413,6 +460,7 @@ export class Game {
       this.updateWasdMovement();
       this.followPlayerCamera();
       this.checkEncounterZones();
+      this.checkGroundItemPickups();
     } else if (this.battleGrid) {
       for (const system of this.battleSystems) {
         system.update(dt, this.entityManager, this.battleGrid);
@@ -841,6 +889,23 @@ export class Game {
     }
   }
 
+  /** Picks up any ground item sitting on the player's own tile straight into the shared inventory
+   *  (first free slot; silently dropped if the inventory is full). */
+  private checkGroundItemPickups(): void {
+    const playerPos = this.entityManager.getComponent(this.playerEntityId, TransformComponent)?.position;
+    if (!playerPos) return;
+
+    for (const id of this.entityManager.query(GroundItemComponent, TransformComponent)) {
+      const pos = this.entityManager.getComponent(id, TransformComponent)!.position;
+      if (pos.x !== playerPos.x || pos.y !== playerPos.y) continue;
+
+      const itemId = this.entityManager.getComponent(id, GroundItemComponent)!.itemId;
+      const freeSlot = this.party.getInventory().indexOf(null);
+      if (freeSlot !== -1) this.party.setInventorySlot(freeSlot, itemId);
+      this.entityManager.destroyEntity(id);
+    }
+  }
+
   private startBattle(enemyPawnIds: string[]): void {
     const anchorPos = this.entityManager.getComponent(this.playerEntityId, TransformComponent)?.position;
     if (!anchorPos) return;
@@ -883,6 +948,8 @@ export class Game {
     this.battleGridView.build();
     this.renderer.sceneRoot.addChildAt(this.battleGridView.container, 0);
     this.gridView.container.visible = false;
+    this.doorView.container.visible = false;
+    this.groundItemView.container.visible = false;
 
     this.camera.setWorldBounds(this.battleGrid.width * TILE_SIZE, this.battleGrid.height * TILE_SIZE);
     const battleCenter = gridToWorld({
@@ -928,6 +995,25 @@ export class Game {
     this.renderer.app.canvas.parentElement?.appendChild(overlay);
   }
 
+  /** Rolls `monsterId`'s lootTable (a plain PawnDefinition property — any monster/NPC can have one,
+   *  this isn't special-cased per pawn) and drops whatever comes up on the overworld tile the party
+   *  returns to (battleAnchorWorldPos), as GroundItemComponent entities the player walks onto to
+   *  collect. */
+  private dropLootFor(monsterId: EntityId): void {
+    const dropPos = this.battleAnchorWorldPos;
+    if (!dropPos) return;
+
+    const pawnDefinitionId = this.entityManager.getComponent(monsterId, PawnComponent)?.pawnDefinitionId;
+    if (!pawnDefinitionId) return;
+
+    const droppedItemIds = rollLoot(this.pawnRegistry.get(pawnDefinitionId));
+    for (const itemId of droppedItemIds) {
+      const groundId = this.entityManager.createEntity();
+      this.entityManager.addComponent(groundId, TransformComponent, new TransformComponent(dropPos));
+      this.entityManager.addComponent(groundId, GroundItemComponent, new GroundItemComponent(itemId));
+    }
+  }
+
   private endBattle(outcome: BattleOutcome): void {
     if (!this.battleGrid || !this.battleGridView) return;
 
@@ -947,6 +1033,7 @@ export class Game {
 
     for (const id of this.entityManager.query(FactionComponent, BattleParticipantComponent)) {
       if (this.entityManager.getComponent(id, FactionComponent)?.faction === Faction.Monster) {
+        this.dropLootFor(id);
         this.entityManager.destroyEntity(id);
       }
     }
@@ -968,6 +1055,8 @@ export class Game {
     this.battleReturnPositions = new Map();
 
     this.gridView.container.visible = true;
+    this.doorView.container.visible = true;
+    this.groundItemView.container.visible = true;
 
     this.camera.setWorldBounds(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE);
     this.camera.manualOverride = false; // resume following the leader back in the overworld
@@ -1000,6 +1089,8 @@ export class Game {
       this.battleActionBarView.element.hidden = true;
       const nonLeaderMembers = this.party.getMembers().filter((id): id is EntityId => id !== null && id !== this.playerEntityId);
       this.pawnView.setHiddenEntities(new Set(nonLeaderMembers));
+      this.doorView.sync();
+      this.groundItemView.sync();
     }
     this.partyBarView.sync();
     if (this.characterSheetView.isVisible()) this.characterSheetView.sync();
