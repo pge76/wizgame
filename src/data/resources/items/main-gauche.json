@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.main-gauche",
+  "displayName": "Main Gauche",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": false,
+  "damageMin": 1,
+  "damageMax": 5,
+  "attackBonus": 0
+}

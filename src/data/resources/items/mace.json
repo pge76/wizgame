@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.mace",
+  "displayName": "Mace",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": false,
+  "damageMin": 2,
+  "damageMax": 7,
+  "attackBonus": 0
+}

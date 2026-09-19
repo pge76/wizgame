@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.claymore",
+  "displayName": "Claymore",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": true,
+  "damageMin": 4,
+  "damageMax": 10,
+  "attackBonus": 0
+}

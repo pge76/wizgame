@@ -1,0 +1,8 @@
+{
+  "id": "item.armor.plate-mail",
+  "displayName": "Plate Mail",
+  "kind": "armor",
+  "stackable": false,
+  "equipSlot": "torso",
+  "defenseBonus": 4
+}

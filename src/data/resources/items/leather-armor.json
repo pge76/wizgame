@@ -1,0 +1,8 @@
+{
+  "id": "item.armor.leather-armor",
+  "displayName": "Leather Armor",
+  "kind": "armor",
+  "stackable": false,
+  "equipSlot": "torso",
+  "defenseBonus": 2
+}

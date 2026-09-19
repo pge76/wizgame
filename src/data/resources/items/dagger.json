@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.dagger",
+  "displayName": "Dagger",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": false,
+  "damageMin": 1,
+  "damageMax": 4,
+  "attackBonus": 0
+}

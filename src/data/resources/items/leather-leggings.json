@@ -1,0 +1,8 @@
+{
+  "id": "item.armor.leather-leggings",
+  "displayName": "Leather Leggings",
+  "kind": "armor",
+  "stackable": false,
+  "equipSlot": "legs",
+  "defenseBonus": 1
+}

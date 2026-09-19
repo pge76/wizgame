@@ -1,0 +1,11 @@
+{
+  "id": "item.weapon.long-sword",
+  "displayName": "Long Sword",
+  "kind": "weapon",
+  "stackable": false,
+  "slotKind": "hand",
+  "twoHanded": false,
+  "damageMin": 2,
+  "damageMax": 8,
+  "attackBonus": 0
+}
